@@ -1,8 +1,8 @@
-# AgentRelay — local agent-to-agent messaging over MCP
+# agent_relay — local agent-to-agent messaging over MCP
 
 **Let agents from different runtimes ask questions, reply, and keep a conversation going.**
 
-AgentRelay is an open-source Python **communication relay between agents**, using
+agent_relay is an open-source Python **communication relay between agents**, using
 a local, durable mailbox exposed by the **Model Context Protocol (MCP)**. Any
 configured peer can initiate a conversation with its permitted peers; **no manager
 is required**. The included runtime adapters support **Codex CLI, Claude Code,
@@ -10,14 +10,14 @@ and API models through optional LiteLLM**. A delivery supervisor starts idle man
 peers, supplies incoming messages, and resumes their recorded sessions.
 
 Use it when you want two coding agents to discuss a proposal, clarify a requirement,
-or check a small answer without copying messages between their terminals. AgentRelay
+or check a small answer without copying messages between their terminals. agent_relay
 routes explicit messages; it does not forward every piece of assistant prose.
 
 Built and maintained by [Hari Naralasetty](https://github.com/harinaralasetty).
 This repository is the **local Python/MCP implementation**, independent of other
 products named Agent Relay. The Python distribution is
-`agentrelay-local`, the command is `agentrelay`, and installation is from this source
-repository. **`pip install agentrelay` installs a different project.**
+`agent_relay`, the command is `agent_relay`, and installation is from this source
+repository. **Install from this repository; no PyPI release is published for this project.**
 
 [Quick start](#quick-start-connect-codex-cli-and-claude-code) ·
 [Your own conversation](#start-your-own-conversation) ·
@@ -27,7 +27,7 @@ repository. **`pip install agentrelay` installs a different project.**
 [Limitations](#limitations-and-permissions) ·
 [Verified results](docs/verification.md)
 
-## What AgentRelay does
+## What agent_relay does
 
 | Capability | Behavior |
 |---|---|
@@ -39,7 +39,7 @@ repository. **`pip install agentrelay` installs a different project.**
 | Duplicate protection | Reusing an idempotency key with the same message returns the original; conflicting reuse fails |
 | Delivery supervision | Idle managed peers receive input; each peer's turns are serialized |
 | Provider-neutral interface | Other runtimes can use the five MCP tools or implement a runtime adapter |
-| Optional API models | LiteLLM supplies inference; AgentRelay provides the bounded MCP tool loop and history |
+| Optional API models | LiteLLM supplies inference; agent_relay provides the bounded MCP tool loop and history |
 
 The included adapters run **managed sessions**, separate from existing desktop chats
 and native subagent trees. They limit the peers to mailbox communication for this
@@ -47,7 +47,7 @@ initial release; this is a conversation bridge, not a general coding-task runner
 
 ```mermaid
 flowchart LR
-    A["Agent A"] <-->|send and receive via MCP| R["AgentRelay"]
+    A["Agent A"] <-->|send and receive via MCP| R["agent_relay"]
     R <-->|send and receive via MCP| B["Agent B"]
 ```
 
@@ -71,24 +71,24 @@ shows the MCP servers, shared mailbox, and optional runtime delivery components.
 
 Check that `uv --version`, `codex --version`, and `claude --version` work in your
 terminal. Follow each provider's sign-in instructions before running the demo.
-AgentRelay uses those local CLI logins; it does not supply or store provider
+agent_relay uses those local CLI logins; it does not supply or store provider
 credentials in the repository. The model calls still go to their respective providers.
 
 ### 2. Install from source
 
 ```sh
-git clone https://github.com/harinaralasetty/agentrelay.git
-cd agentrelay
+git clone https://github.com/harinaralasetty/agent_relay.git
+cd agent_relay
 uv sync --locked --python 3.12
-uv run agentrelay --help
+uv run agent_relay --help
 ```
 
-No PyPI release of `agentrelay-local` is claimed. You can also build a local wheel with `uv build`.
+No PyPI release of `agent_relay` is claimed. You can also build a local wheel with `uv build`.
 
 ### 3. Run a small live conversation
 
 ```sh
-uv run agentrelay demo .agentrelay/first --initiator cedar \
+uv run agent_relay demo .agent_relay/first --initiator cedar \
   --codex-model gpt-6-luna --claude-model haiku
 ```
 
@@ -111,18 +111,18 @@ closure, with no runtime errors. A reply consumed during an active turn may rema
 `stored` because it needed no separate dispatch. Inspect the saved transcript with:
 
 ```sh
-uv run agentrelay inspect .agentrelay/first/config.json
+uv run agent_relay inspect .agent_relay/first/config.json
 ```
 
 To let Claude initiate, use a **new state directory**:
 
 ```sh
-uv run agentrelay demo .agentrelay/reverse --initiator birch \
+uv run agent_relay demo .agent_relay/reverse --initiator birch \
   --codex-model gpt-6-luna --claude-model haiku
 ```
 
 Initialization refuses to overwrite a config. State directories contain private
-peer tokens, mailbox transcripts, and provider-session records; `.agentrelay/` is
+peer tokens, mailbox transcripts, and provider-session records; `.agent_relay/` is
 ignored by Git. Keep any state you place elsewhere out of version control too.
 
 ## Start your own conversation
@@ -130,18 +130,18 @@ ignored by Git. Keep any state you place elsewhere out of version control too.
 Create a separate workspace and choose models explicitly:
 
 ```sh
-uv run agentrelay init .agentrelay/my-task \
+uv run agent_relay init .agent_relay/my-task \
   --codex-model gpt-6-luna --claude-model haiku
 ```
 
-Before the first run, edit `.agentrelay/my-task/config.json` to choose the
+Before the first run, edit `.agent_relay/my-task/config.json` to choose the
 conversation ID, models, permitted recipients, and limits. The generated conversation
 ID is `demo`; use that ID in prompts unless you change it in the config.
 
 ```sh
-uv run agentrelay run .agentrelay/my-task/config.json --peer cedar \
+uv run agent_relay run .agent_relay/my-task/config.json --peer cedar \
   --prompt "In conversation demo, send birch this question: Should a Python function that returns a boolean start with is_? Ask for one example, then send a final=true message after the answer."
-uv run agentrelay inspect .agentrelay/my-task/config.json
+uv run agent_relay inspect .agent_relay/my-task/config.json
 ```
 
 Replace the prompt with a small discussion task. The agents choose when to send
@@ -153,7 +153,7 @@ queued messages, and stops when the owned queues drain. Healthy sessions resume 
 arrive while the supervisor is idle, keep it running with:
 
 ```sh
-uv run agentrelay run .agentrelay/my-task/config.json --watch
+uv run agent_relay run .agent_relay/my-task/config.json --watch
 ```
 
 Watch mode stops on cancellation or the configured wall-time limit. Configuration
@@ -168,7 +168,7 @@ This is an optional delegation example. Ordinary peer-to-peer conversations do
 not need a manager.
 
 A manager is a **configured peer with a task prompt**, not a special provider or a
-native subagent parent. AgentRelay launches its workers when assignments arrive,
+native subagent parent. agent_relay launches its workers when assignments arrive,
 keeps their sessions separate, and delivers results back to the manager. Workers
 can run concurrently; input to each individual peer stays serialized.
 
@@ -176,11 +176,11 @@ Run the bounded example in both directions, using a new directory each time:
 
 ```sh
 # Claude Haiku manager → two Codex GPT-6 Luna workers
-uv run agentrelay delegation-demo .agentrelay/claude-manager --manager claude \
+uv run agent_relay delegation-demo .agent_relay/claude-manager --manager claude \
   --codex-model gpt-6-luna --claude-model haiku
 
 # Codex GPT-6 Luna manager → two Claude Haiku workers
-uv run agentrelay delegation-demo .agentrelay/codex-manager --manager codex \
+uv run agent_relay delegation-demo .agent_relay/codex-manager --manager codex \
   --codex-model gpt-6-luna --claude-model haiku
 ```
 
@@ -205,7 +205,7 @@ flowchart TD
 For your own small text tasks, initialize a team without calling any models:
 
 ```sh
-uv run agentrelay init .agentrelay/my-team --manager claude \
+uv run agent_relay init .agent_relay/my-team --manager claude \
   --codex-model gpt-6-luna --claude-model haiku
 ```
 
@@ -216,9 +216,9 @@ manager. Edit the conversation ID and limits **before the first run** if needed.
 Start the manager with your instructions:
 
 ```sh
-uv run agentrelay run .agentrelay/my-team/config.json --peer manager \
+uv run agent_relay run .agent_relay/my-team/config.json --peer manager \
   --prompt "Use conversation_id='delegation' in every send. Assign worker-a to suggest one name for a boolean validation function, and worker-b to explain one benefit of the name is_valid. Send both assignments now. Tell workers to ACK, send a linked reply with final=false, then return. Receive and ACK both results, review them, then send worker-a one final=true summary linked to its result."
-uv run agentrelay inspect .agentrelay/my-team/config.json
+uv run agent_relay inspect .agent_relay/my-team/config.json
 ```
 
 For custom tasks, `run` reports delivery/runtime errors; it does **not** judge the
@@ -242,7 +242,7 @@ produce a nonzero exit, and are never automatically retried. Inspect the transcr
 and provider outcome before recording an administrative decision:
 
 ```sh
-uv run agentrelay resolve .agentrelay/my-task/config.json MESSAGE_ID --outcome failed
+uv run agent_relay resolve .agent_relay/my-task/config.json MESSAGE_ID --outcome failed
 ```
 
 Use `--outcome completed` only when your review establishes completion. Resolution
@@ -268,13 +268,13 @@ the shared store. Then configure its per-peer server using this Claude-style sha
 ```json
 {
   "mcpServers": {
-    "agentrelay": {
-      "command": "/absolute/path/to/agentrelay/.venv/bin/python",
-      "args": ["-m", "agentrelay.mcp_server"],
+    "agent_relay": {
+      "command": "/absolute/path/to/agent_relay/.venv/bin/python",
+      "args": ["-m", "agent_relay.mcp_server"],
       "env": {
-        "AGENTRELAY_DB": "/absolute/path/to/state/mail.sqlite",
-        "AGENTRELAY_PEER": "registered-peer-id",
-        "AGENTRELAY_TOKEN": "generated-private-peer-token"
+        "AGENT_RELAY_DB": "/absolute/path/to/state/mail.sqlite",
+        "AGENT_RELAY_PEER": "registered-peer-id",
+        "AGENT_RELAY_TOKEN": "generated-private-peer-token"
       }
     }
   }
@@ -303,24 +303,24 @@ therefore does not automatically run every model or wake an idle agent.
 
 [LiteLLM](https://docs.litellm.ai/docs/) translates provider API calls;
 [MCP](https://modelcontextprotocol.io/docs/learn/architecture) connects the mailbox
-tools. AgentRelay supplies the agent loop around both. The optional dependency is
+tools. agent_relay supplies the agent loop around both. The optional dependency is
 pinned and kept out of the standard CLI installation.
 The pinned LiteLLM extra currently supports Python 3.12–3.14.
 
 ```sh
 uv sync --locked --extra models
-uv run --extra models agentrelay init .agentrelay/mixed \
+uv run --extra models agent_relay init .agent_relay/mixed \
   --codex-model gpt-6-luna --claude-model haiku
 
 # Set MODEL_API_KEY in your shell using your provider's secure credential setup.
 # Replace PROVIDER/MODEL_ID with a LiteLLM-supported, tool-calling model ID.
-uv run --extra models agentrelay add-peer .agentrelay/mixed/config.json maple \
+uv run --extra models agent_relay add-peer .agent_relay/mixed/config.json maple \
   --runtime litellm --model PROVIDER/MODEL_ID \
   --api-key-env MODEL_API_KEY --allowed cedar birch --reciprocal
 
-uv run --extra models agentrelay run .agentrelay/mixed/config.json --peer cedar \
+uv run --extra models agent_relay run .agent_relay/mixed/config.json --peer cedar \
   --prompt "In conversation demo, ask maple for one benefit of explicit acknowledgments. ACK its linked reply, then send it a final=true thank-you."
-uv run --extra models agentrelay inspect .agentrelay/mixed/config.json
+uv run --extra models agent_relay inspect .agent_relay/mixed/config.json
 ```
 
 This adds `maple` while keeping Codex `cedar` and Claude Code `birch`. `--allowed`
@@ -383,6 +383,6 @@ uv build
 ```
 
 Read the [development workflow](CONTRIBUTING.md) before changing adapters or routing.
-Report reproducible problems through [GitHub issues](https://github.com/harinaralasetty/agentrelay/issues),
+Report reproducible problems through [GitHub issues](https://github.com/harinaralasetty/agent_relay/issues),
 with versions and redacted errors; exclude tokens and private transcripts.
 [MIT licensed](LICENSE).

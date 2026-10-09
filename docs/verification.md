@@ -74,9 +74,9 @@ This record describes measured evidence, not a guarantee that all defects are ab
 
 ## Package and namespace qualification — 9 October 2026
 
-The verified public identity is AgentRelay. Python distribution:
-`agentrelay-local`; module/CLI/MCP server name: `agentrelay`; MCP environment prefix:
-`AGENTRELAY_`. Existing mailbox and config formats were preserved.
+The verified public identity is agent_relay. Python distribution:
+`agent_relay`; module/CLI/MCP server name: `agent_relay`; MCP environment prefix:
+`AGENT_RELAY_`. Existing mailbox and config formats were preserved.
 
 | Fresh check after the rename | Observed result |
 |---|---|
@@ -196,3 +196,22 @@ mailbox operations, cancellation after a send, bounds, and redacted diagnostics.
 Retries, fallbacks, cache and callback logging are disabled; SDK import uses its
 bundled cost map. API cost reporting remains unknown. Private state, credentials
 and test receipts are excluded from both published packages and Git.
+
+## Current namespace qualification — 9 October 2026
+
+Version 0.2.1 uses `agent_relay` for the repository, CLI, Python package, MCP server
+and diagram labels; MCP environment variables use `AGENT_RELAY_*`.
+
+| Check | Observed result |
+|---|---|
+| Full automated suite after folder/environment rebuild | 127 passed |
+| Independent focused namespace/runtime review | 75 passed; no remaining runtime rename defect |
+| Fresh Codex-initiated and Claude-initiated conversations | 2/2 passed; five exact linked, ACKed messages each; three turns per peer |
+| Previously saved native CLI sessions after folder change | 2/2 resumed with original session IDs and completed a mailbox-tool check |
+| Existing private API history location | Resume regression passed; same session and history retained without replay or file migration |
+| Lint, formatting, build and clean wheel CLI installation | Passed |
+
+Both live demos exited 0 without runtime errors or unresolved deliveries. The
+resume probes called `peer_list` and sent no messages. The provider accounts,
+models and CLI versions are unchanged. Old private history and state locations
+remain ignored; published documentation uses only the current public identity.

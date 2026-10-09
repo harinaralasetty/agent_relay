@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-from agentrelay.cli import initialize, load, verify_demo
+from agent_relay.cli import initialize, load, verify_demo
 
 
 def test_init_is_private_and_never_overwrites_config(tmp_path):
@@ -24,7 +24,7 @@ def test_inspect_has_no_secrets_and_does_not_call_provider(tmp_path):
     path = initialize(tmp_path / "state", "not-real", "not-real")
     config = json.loads(path.read_text())
     result = subprocess.run(
-        [sys.executable, "-m", "agentrelay", "inspect", str(path)],
+        [sys.executable, "-m", "agent_relay", "inspect", str(path)],
         capture_output=True,
         text=True,
         timeout=10,
@@ -84,7 +84,7 @@ def test_demo_requires_full_acknowledged_completed_exchange():
 
 
 def test_demo_accepts_consumed_mailbox_messages_but_rejects_uncertain_delivery():
-    from agentrelay.cli import DEMO_TEXTS
+    from agent_relay.cli import DEMO_TEXTS
 
     messages = [
         {

@@ -8,11 +8,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-from agentrelay.adapters.litellm import LiteLLMRuntime
-from agentrelay.cli import DEMO_TEXTS, verify_demo
-from agentrelay.runtime import RuntimeConfig
-from agentrelay.store import Store
-from agentrelay.supervisor import Supervisor
+from agent_relay.adapters.litellm import LiteLLMRuntime
+from agent_relay.cli import DEMO_TEXTS, verify_demo
+from agent_relay.runtime import RuntimeConfig
+from agent_relay.store import Store
+from agent_relay.supervisor import Supervisor
 
 
 @pytest.mark.parametrize("initiator", ["alpha", "beta"])
@@ -108,11 +108,11 @@ async def test_sdk_and_mcp_two_way_conversation(tmp_path, monkeypatch, initiator
                 f"openai/{peer}",
                 str(workspace),
                 sys.executable,
-                ["-m", "agentrelay.mcp_server"],
+                ["-m", "agent_relay.mcp_server"],
                 {
-                    "AGENTRELAY_DB": str(store.path),
-                    "AGENTRELAY_PEER": peer,
-                    "AGENTRELAY_TOKEN": peer,
+                    "AGENT_RELAY_DB": str(store.path),
+                    "AGENT_RELAY_PEER": peer,
+                    "AGENT_RELAY_TOKEN": peer,
                 },
                 api_key_env="LOCAL_TEST_KEY",
                 api_base=f"http://127.0.0.1:{server.server_port}/v1",

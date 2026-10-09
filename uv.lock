@@ -9,8 +9,8 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "agentrelay-local"
-version = "0.2.0"
+name = "agent-relay"
+version = "0.2.1"
 source = { editable = "." }
 dependencies = [
     { name = "mcp" },

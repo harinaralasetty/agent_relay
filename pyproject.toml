@@ -3,8 +3,8 @@ requires = ["hatchling>=1.27,<2"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agentrelay-local"
-version = "0.2.0"
+name = "agent_relay"
+version = "0.2.1"
 description = "Local agent messaging over MCP for Codex CLI, Claude Code, and LiteLLM models"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -27,12 +27,12 @@ classifiers = [
 models = ["litellm==1.104.2"]
 
 [project.urls]
-Repository = "https://github.com/harinaralasetty/agentrelay"
-Documentation = "https://github.com/harinaralasetty/agentrelay#readme"
-Issues = "https://github.com/harinaralasetty/agentrelay/issues"
+Repository = "https://github.com/harinaralasetty/agent_relay"
+Documentation = "https://github.com/harinaralasetty/agent_relay#readme"
+Issues = "https://github.com/harinaralasetty/agent_relay/issues"
 
 [project.scripts]
-agentrelay = "agentrelay.cli:main"
+agent_relay = "agent_relay.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8,<9", "pytest-asyncio>=0.24,<2", "ruff>=0.11,<1", "build>=1.2,<2"]
@@ -48,4 +48,4 @@ line-length = 100
 select = ["E", "F", "I", "B", "UP"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/agentrelay"]
+packages = ["src/agent_relay"]

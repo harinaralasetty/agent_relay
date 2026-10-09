@@ -4,9 +4,9 @@ import sys
 
 import pytest
 
-from agentrelay.adapters.litellm import LiteLLMRuntime
-from agentrelay.runtime import RuntimeConfig, RuntimeFailure
-from agentrelay.store import Store
+from agent_relay.adapters.litellm import LiteLLMRuntime
+from agent_relay.runtime import RuntimeConfig, RuntimeFailure
+from agent_relay.store import Store
 
 
 async def test_native_session_rejected(tmp_path):
@@ -17,6 +17,27 @@ async def test_native_session_rejected(tmp_path):
     )
     with pytest.raises(RuntimeFailure):
         await runtime.start()
+
+
+async def test_saved_history_survives_namespace_rename(tmp_path, monkeypatch):
+    from dataclasses import replace
+
+    runtime = LiteLLMRuntime(config(tmp_path))
+
+    async def complete(**kwargs):
+        return response(content="saved")
+
+    monkeypatch.setattr("agent_relay.adapters.litellm._completion", complete)
+    await runtime.start()
+    result = await runtime.turn("one")
+    await runtime.close()
+    runtime._path.parent.rename(tmp_path / ".agentrelay-litellm")
+    resumed = LiteLLMRuntime(replace(runtime.config, resume_session=result.session_id))
+    await resumed.start()
+    assert resumed.session_id == result.session_id
+    assert (await resumed.turn("two")).text == "saved"
+    assert len(resumed._state["messages"]) == 4
+    await resumed.close()
 
 
 def config(tmp_path, **kwargs):
@@ -30,8 +51,8 @@ def config(tmp_path, **kwargs):
         "openai/test",
         str(tmp_path),
         sys.executable,
-        ["-m", "agentrelay.mcp_server"],
-        {"AGENTRELAY_DB": str(path), "AGENTRELAY_PEER": "alpha", "AGENTRELAY_TOKEN": "secret-a"},
+        ["-m", "agent_relay.mcp_server"],
+        {"AGENT_RELAY_DB": str(path), "AGENT_RELAY_PEER": "alpha", "AGENT_RELAY_TOKEN": "secret-a"},
         **kwargs,
     )
 
@@ -75,7 +96,7 @@ async def test_real_mcp_send_and_resume(tmp_path, monkeypatch):
             )
         return response(content="sent")
 
-    monkeypatch.setattr("agentrelay.adapters.litellm._completion", complete)
+    monkeypatch.setattr("agent_relay.adapters.litellm._completion", complete)
     await runtime.start()
     # Different tasks are deliberate: no MCP cancel scope may escape a turn.
     result = await asyncio.create_task(runtime.turn("send hello"))
@@ -122,7 +143,7 @@ async def test_malformed_response_dirty_and_no_retry(tmp_path, monkeypatch, bad)
         attempts.append(1)
         return bad
 
-    monkeypatch.setattr("agentrelay.adapters.litellm._completion", complete)
+    monkeypatch.setattr("agent_relay.adapters.litellm._completion", complete)
     await runtime.start()
     with pytest.raises(RuntimeFailure, match="no retry"):
         await runtime.turn("hello")
@@ -142,7 +163,7 @@ async def test_provider_error_redacted(tmp_path, monkeypatch):
         assert kwargs["api_key"] == "credential-value"
         raise ValueError("credential-value secret-a")
 
-    monkeypatch.setattr("agentrelay.adapters.litellm._completion", complete)
+    monkeypatch.setattr("agent_relay.adapters.litellm._completion", complete)
     await runtime.start()
     with pytest.raises(RuntimeFailure) as caught:
         await runtime.turn("hello")
@@ -159,7 +180,7 @@ async def test_round_bound(tmp_path, monkeypatch):
         attempts.append(1)
         return response([call(identifier=str(len(attempts)))])
 
-    monkeypatch.setattr("agentrelay.adapters.litellm._completion", complete)
+    monkeypatch.setattr("agent_relay.adapters.litellm._completion", complete)
     await runtime.start()
     with pytest.raises(RuntimeFailure):
         await runtime.turn("hello")
@@ -172,7 +193,7 @@ async def test_timeout_leaves_dirty_history(tmp_path, monkeypatch):
     async def complete(**kwargs):
         await asyncio.sleep(10)
 
-    monkeypatch.setattr("agentrelay.adapters.litellm._completion", complete)
+    monkeypatch.setattr("agent_relay.adapters.litellm._completion", complete)
     await runtime.start()
     with pytest.raises(RuntimeFailure):
         await runtime.turn("hello")
@@ -206,7 +227,7 @@ async def test_interruption_after_effect_fails_closed(tmp_path, monkeypatch):
         entered.set()
         await asyncio.Event().wait()
 
-    monkeypatch.setattr("agentrelay.adapters.litellm._completion", complete)
+    monkeypatch.setattr("agent_relay.adapters.litellm._completion", complete)
     await runtime.start()
     task = asyncio.create_task(runtime.turn("send"))
     await asyncio.wait_for(entered.wait(), 3)
@@ -225,7 +246,7 @@ async def test_output_bound(tmp_path, monkeypatch):
     async def complete(**kwargs):
         return response(content="x" * (1024 * 1024))
 
-    monkeypatch.setattr("agentrelay.adapters.litellm._completion", complete)
+    monkeypatch.setattr("agent_relay.adapters.litellm._completion", complete)
     await runtime.start()
     with pytest.raises(RuntimeFailure):
         await runtime.turn("hello")
@@ -242,7 +263,7 @@ async def test_stale_loaded_history_rejected(tmp_path, monkeypatch):
     async def complete(**kwargs):
         return response(content="done")
 
-    monkeypatch.setattr("agentrelay.adapters.litellm._completion", complete)
+    monkeypatch.setattr("agent_relay.adapters.litellm._completion", complete)
     await runtime.turn("one")
     with pytest.raises(RuntimeFailure):
         await stale.turn("two")
@@ -352,7 +373,7 @@ async def test_mailbox_rejections_are_generic(tmp_path, monkeypatch, tool, args)
         }
         return response(content="rejected")
 
-    monkeypatch.setattr("agentrelay.adapters.litellm._completion", complete)
+    monkeypatch.setattr("agent_relay.adapters.litellm._completion", complete)
     await runtime.start()
     assert (await runtime.turn("try")).text == "rejected"
     await runtime.close()

@@ -5,7 +5,7 @@ import os
 import secrets
 from pathlib import Path
 
-from agentrelay.store import MAX_MESSAGES
+from agent_relay.store import MAX_MESSAGES
 
 MANAGER = "manager"
 CONVERSATION = "delegation"

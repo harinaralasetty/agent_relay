@@ -11,8 +11,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from agentrelay.runtime import DEFAULT_OUTPUT_TOKENS, DEFAULT_TOOL_ROUNDS
-from agentrelay.store import MAX_MESSAGES, identifier
+from agent_relay.runtime import DEFAULT_OUTPUT_TOKENS, DEFAULT_TOOL_ROUNDS
+from agent_relay.store import MAX_MESSAGES, identifier
 
 SUPPORTED_RUNTIMES = ("codex", "claude", "litellm")
 MAX_TOOL_ROUNDS = 64

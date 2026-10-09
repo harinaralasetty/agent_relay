@@ -1,6 +1,6 @@
 # Architecture and delivery contract
 
-AgentRelay is a local, provider-neutral mailbox with optional runtime supervision.
+agent_relay is a local, provider-neutral mailbox with optional runtime supervision.
 Every peer gets the same MCP tool contract. Runtime adapters support
 Codex app-server roots, Claude Code CLI sessions, and optional LiteLLM API models.
 Additional runtimes can use
@@ -99,7 +99,7 @@ their owned process groups.
 
 These are managed peers, not entries in a desktop app's native subagent tree.
 Direct external input to native Codex V2 children is restricted; an owning parent
-must relay messages using its native collaboration interface. AgentRelay does
+must relay messages using its native collaboration interface. agent_relay does
 not implement that parent relay or attach to arbitrary already-running desktop
 chats. MCP notifications alone do not provide idle wake.
 
@@ -141,7 +141,7 @@ use, then initialize a fresh workspace for a different topology.
   verification belongs above the transport.
 - API/account limits, organizational policy and changing CLI interfaces still
   apply. Use provider-supported credentials. No credentials are supplied or
-  extracted by AgentRelay; CLIs use local logins, API peers use explicit environment
+  extracted by agent_relay; CLIs use local logins, API peers use explicit environment
   key references or a local endpoint. API access does not inherit CLI subscriptions.
 
 ## Primary references

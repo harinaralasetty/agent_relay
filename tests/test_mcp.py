@@ -4,7 +4,7 @@ import sys
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-from agentrelay.store import Store
+from agent_relay.store import Store
 
 
 async def test_two_stdio_servers_share_authenticated_mailbox(tmp_path):
@@ -17,8 +17,8 @@ async def test_two_stdio_servers_share_authenticated_mailbox(tmp_path):
     def params(peer, token):
         return StdioServerParameters(
             command=sys.executable,
-            args=["-m", "agentrelay.mcp_server"],
-            env={"AGENTRELAY_DB": str(path), "AGENTRELAY_PEER": peer, "AGENTRELAY_TOKEN": token},
+            args=["-m", "agent_relay.mcp_server"],
+            env={"AGENT_RELAY_DB": str(path), "AGENT_RELAY_PEER": peer, "AGENT_RELAY_TOKEN": token},
         )
 
     async with stdio_client(params("alpha", "secret-a")) as (ar, aw):
@@ -63,11 +63,11 @@ async def test_invalid_mcp_identity_cannot_read_mail(tmp_path):
     Store(path).register("alpha", "correct-secret", [])
     params = StdioServerParameters(
         command=sys.executable,
-        args=["-m", "agentrelay.mcp_server"],
+        args=["-m", "agent_relay.mcp_server"],
         env={
-            "AGENTRELAY_DB": str(path),
-            "AGENTRELAY_PEER": "alpha",
-            "AGENTRELAY_TOKEN": "wrong-secret",
+            "AGENT_RELAY_DB": str(path),
+            "AGENT_RELAY_PEER": "alpha",
+            "AGENT_RELAY_TOKEN": "wrong-secret",
         },
     )
     async with stdio_client(params) as (r, w):

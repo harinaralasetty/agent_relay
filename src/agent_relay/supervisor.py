@@ -5,11 +5,11 @@ import fcntl
 import json
 import time
 
-from agentrelay.runtime import Runtime, RuntimeFailure
-from agentrelay.store import Store
+from agent_relay.runtime import Runtime, RuntimeFailure
+from agent_relay.store import Store
 
 PEER_CONTEXT = (
-    "You are an AgentRelay peer. Use ONLY the mailbox MCP tools for this task. "
+    "You are an agent_relay peer. Use ONLY the mailbox MCP tools for this task. "
     "Send messages explicitly with peer_send; plain assistant output is not forwarded. "
     "Always preserve conversation_id and use reply_to for replies. "
     "Use a distinct idempotency_key for each logical send. "

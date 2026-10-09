@@ -9,10 +9,10 @@ import sys
 from dataclasses import replace
 from pathlib import Path
 
-from agentrelay.adapters.claude import ClaudeRuntime
-from agentrelay.adapters.codex import CodexRuntime
-from agentrelay.delegation import initialize_delegation, manager_prompt, verify_delegation
-from agentrelay.peers import (
+from agent_relay.adapters.claude import ClaudeRuntime
+from agent_relay.adapters.codex import CodexRuntime
+from agent_relay.delegation import initialize_delegation, manager_prompt, verify_delegation
+from agent_relay.peers import (
     DEFAULT_OUTPUT_TOKENS,
     DEFAULT_TOOL_ROUNDS,
     SUPPORTED_RUNTIMES,
@@ -20,9 +20,9 @@ from agentrelay.peers import (
     configuration_lock,
     validate,
 )
-from agentrelay.runtime import RuntimeConfig
-from agentrelay.store import Store
-from agentrelay.supervisor import Supervisor
+from agent_relay.runtime import RuntimeConfig
+from agent_relay.store import Store
+from agent_relay.supervisor import Supervisor
 
 DEFAULT_CODEX_MODEL = "gpt-6-luna"
 DEFAULT_CLAUDE_MODEL = "haiku"
@@ -30,7 +30,7 @@ DEFAULT_TEAM_MAX_MESSAGES = 12
 
 
 def _litellm_runtime(options):
-    from agentrelay.adapters.litellm import LiteLLMRuntime
+    from agent_relay.adapters.litellm import LiteLLMRuntime
 
     return LiteLLMRuntime(options)
 
@@ -103,11 +103,11 @@ def make_runtimes(config: dict, store: Store) -> dict:
             model=definition["model"],
             cwd=str(workspace),
             mcp_command=sys.executable,
-            mcp_args=["-m", "agentrelay.mcp_server"],
+            mcp_args=["-m", "agent_relay.mcp_server"],
             mcp_env={
-                "AGENTRELAY_DB": str(store.path),
-                "AGENTRELAY_PEER": peer,
-                "AGENTRELAY_TOKEN": definition["token"],
+                "AGENT_RELAY_DB": str(store.path),
+                "AGENT_RELAY_PEER": peer,
+                "AGENT_RELAY_TOKEN": definition["token"],
             },
             timeout=definition.get("timeout", 90),
             effort="low",
@@ -170,7 +170,7 @@ def verify_demo(messages: list[dict]) -> bool:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="AgentRelay local agent conversations")
+    parser = argparse.ArgumentParser(description="agent_relay local agent conversations")
     commands = parser.add_subparsers(dest="command", required=True)
     init = commands.add_parser("init", help="Create private local config (never overwrites)")
     init.add_argument("directory", type=Path)
@@ -215,11 +215,11 @@ def main() -> None:
     delegation.add_argument("--manager", choices=["claude", "codex"], default="claude")
     delegation.add_argument("--codex-model", default=DEFAULT_CODEX_MODEL)
     delegation.add_argument("--claude-model", default=DEFAULT_CLAUDE_MODEL)
-    commands.add_parser("mcp", help="Run per-peer stdio MCP using AGENTRELAY_* environment")
+    commands.add_parser("mcp", help="Run per-peer stdio MCP using AGENT_RELAY_* environment")
     args = parser.parse_args()
     try:
         if args.command == "mcp":
-            from agentrelay.mcp_server import main as mcp_main
+            from agent_relay.mcp_server import main as mcp_main
 
             mcp_main()
         elif args.command == "init":
@@ -284,7 +284,7 @@ def main() -> None:
             if report["errors"]:
                 raise SystemExit(1)
     except (ValueError, OSError) as exc:
-        print(f"AgentRelay: {type(exc).__name__}: {exc}", file=sys.stderr)
+        print(f"agent_relay: {type(exc).__name__}: {exc}", file=sys.stderr)
         raise SystemExit(1) from None
 
 

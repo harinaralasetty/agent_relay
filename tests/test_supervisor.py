@@ -2,9 +2,9 @@ import asyncio
 
 import pytest
 
-from agentrelay.runtime import RuntimeFailure, TurnResult
-from agentrelay.store import Store
-from agentrelay.supervisor import Supervisor
+from agent_relay.runtime import RuntimeFailure, TurnResult
+from agent_relay.store import Store
+from agent_relay.supervisor import Supervisor
 
 
 class TestRuntime:

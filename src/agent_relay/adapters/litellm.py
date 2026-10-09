@@ -13,12 +13,14 @@ from pathlib import Path
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-from agentrelay.runtime import RuntimeConfig, RuntimeFailure, TurnResult
+from agent_relay.runtime import RuntimeConfig, RuntimeFailure, TurnResult
 
 _MAILBOX_TOOLS = {"peer_list", "peer_send", "peer_inbox", "peer_ack", "peer_status"}
 _MAX_MESSAGE_BYTES = 1024 * 1024
 _MAX_HISTORY_BYTES = 4 * _MAX_MESSAGE_BYTES
 _MAX_CALLS = 32
+_HISTORY_DIRECTORY = ".agent_relay-litellm"
+_PREVIOUS_HISTORY_DIRECTORY = ".agentrelay-litellm"
 
 
 async def _completion(**kwargs):
@@ -137,13 +139,19 @@ class LiteLLMRuntime:
             if self.session_id:
                 return
             try:
-                directory = Path(self.config.cwd) / ".agentrelay-litellm"
+                directory = Path(self.config.cwd) / _HISTORY_DIRECTORY
+                resume = self.config.resume_session
+                # Resume existing private histories without moving or replaying them.
+                if resume and resume.startswith("litellm:"):
+                    previous = Path(self.config.cwd) / _PREVIOUS_HISTORY_DIRECTORY
+                    saved_name = str(uuid.UUID(resume[8:])) + ".json"
+                    if not (directory / saved_name).exists() and (previous / saved_name).exists():
+                        directory = previous
                 if directory.is_symlink():
                     raise ValueError()
                 directory.mkdir(mode=0o700, exist_ok=True)
                 if directory.stat().st_mode & 0o077:
                     raise ValueError()
-                resume = self.config.resume_session
                 if resume is not None:
                     if not resume.startswith("litellm:"):
                         raise ValueError()
@@ -250,7 +258,7 @@ class LiteLLMRuntime:
                                         fallbacks=[],
                                     )
                                     # A nonempty placeholder blocks SDK ambient credential lookup.
-                                    kwargs["api_key"] = key or "agentrelay-no-credential"
+                                    kwargs["api_key"] = key or "agent_relay-no-credential"
                                     kwargs["no-log"] = True
                                     if self.config.api_base:
                                         kwargs["api_base"] = self.config.api_base

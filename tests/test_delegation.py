@@ -6,8 +6,8 @@ import os
 
 import pytest
 
-from agentrelay.cli import load
-from agentrelay.delegation import initialize_delegation, verify_delegation
+from agent_relay.cli import load
+from agent_relay.delegation import initialize_delegation, verify_delegation
 
 
 @pytest.mark.parametrize("manager_runtime", ["claude", "codex"])
@@ -123,11 +123,11 @@ def test_cli_can_initialize_a_manager_team_without_calling_models(
 ):
     import sys
 
-    from agentrelay.cli import main
+    from agent_relay.cli import main
 
     path = tmp_path / "team"
     monkeypatch.setattr(
-        sys, "argv", ["agentrelay", "init", str(path), "--manager", manager_runtime]
+        sys, "argv", ["agent_relay", "init", str(path), "--manager", manager_runtime]
     )
     main()
     config, _ = load(path / "config.json")
@@ -138,13 +138,13 @@ def test_cli_can_initialize_a_manager_team_without_calling_models(
 def test_delegation_cli_fails_when_idle_without_worker_results(tmp_path, monkeypatch, capsys):
     import sys
 
-    from agentrelay import cli
+    from agent_relay import cli
 
     async def empty_run(*args, **kwargs):
         return {"errors": [], "outputs": [], "unresolved_messages": []}
 
     monkeypatch.setattr(cli, "run", empty_run)
-    monkeypatch.setattr(sys, "argv", ["agentrelay", "delegation-demo", str(tmp_path / "empty")])
+    monkeypatch.setattr(sys, "argv", ["agent_relay", "delegation-demo", str(tmp_path / "empty")])
     with pytest.raises(SystemExit) as exit_info:
         cli.main()
     assert exit_info.value.code == 1
@@ -156,8 +156,8 @@ def test_delegation_cli_rejects_runtime_errors_even_with_valid_messages(
 ):
     import sys
 
-    from agentrelay import cli
-    from agentrelay.store import Store
+    from agent_relay import cli
+    from agent_relay.store import Store
 
     async def failed_run(*args, **kwargs):
         return {"errors": [{"error": "Cleanup failed"}], "outputs": [], "unresolved_messages": []}
@@ -166,7 +166,7 @@ def test_delegation_cli_rejects_runtime_errors_even_with_valid_messages(
     monkeypatch.setattr(
         Store, "messages", lambda *args: transcript(["a", "b", "ra", "rb", "close"])
     )
-    monkeypatch.setattr(sys, "argv", ["agentrelay", "delegation-demo", str(tmp_path / "failed")])
+    monkeypatch.setattr(sys, "argv", ["agent_relay", "delegation-demo", str(tmp_path / "failed")])
     with pytest.raises(SystemExit) as exit_info:
         cli.main()
     assert exit_info.value.code == 1
@@ -174,7 +174,7 @@ def test_delegation_cli_rejects_runtime_errors_even_with_valid_messages(
 
 
 def test_manager_prompt_supplies_the_registered_conversation_id_explicitly():
-    from agentrelay.delegation import manager_prompt
+    from agent_relay.delegation import manager_prompt
 
     prompt = manager_prompt()
     assert "conversation_id='delegation'" in prompt

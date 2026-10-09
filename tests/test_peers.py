@@ -5,8 +5,8 @@ import sys
 
 import pytest
 
-from agentrelay.cli import initialize, load, make_runtimes
-from agentrelay.peers import add_peer
+from agent_relay.cli import initialize, load, make_runtimes
+from agent_relay.peers import add_peer
 
 
 def test_add_api_peer_preserves_clis_and_adds_explicit_routes(tmp_path):
@@ -112,7 +112,7 @@ def test_add_peer_command_and_optional_import_are_lazy(tmp_path):
         [
             sys.executable,
             "-m",
-            "agentrelay",
+            "agent_relay",
             "add-peer",
             str(path),
             "maple",
@@ -132,6 +132,6 @@ def test_add_peer_command_and_optional_import_are_lazy(tmp_path):
     )
     assert result.returncode == 0, result.stderr
     assert "token" not in result.stdout
-    code = "from agentrelay.cli import main; import sys; assert 'litellm' not in sys.modules"
+    code = "from agent_relay.cli import main; import sys; assert 'litellm' not in sys.modules"
     result = subprocess.run([sys.executable, "-c", code], capture_output=True, timeout=10)
     assert result.returncode == 0
