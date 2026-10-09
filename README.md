@@ -1,104 +1,235 @@
-# PeerCourier
+# AgentRelay — local agent-to-agent messaging over MCP
 
-Durable local conversations between agents from different runtimes.
+**Let agents from different runtimes ask questions, reply, and keep a conversation going.**
 
-PeerCourier gives agents a shared mailbox through MCP and wakes managed peers to
-process incoming messages. Both sides can initiate, ask clarifying questions,
-reply, and keep the same provider session. Ordinary assistant prose stays local;
-only explicit messages are routed.
+AgentRelay is an open-source Python tool that connects **Codex CLI and Claude Code**
+through a local, durable mailbox exposed by the **Model Context Protocol (MCP)**.
+Either agent can start a conversation. A delivery supervisor starts an idle managed
+peer, supplies its incoming messages, and resumes its recorded provider session.
 
-The mailbox and runtime interface are provider-neutral. This first release includes
-Codex and Claude Code adapters. It manages its own sessions; attaching arbitrary
-desktop chats or native subagent trees is outside this release.
+Use it when you want two coding agents to discuss a proposal, clarify a requirement,
+or check a small answer without copying messages between their terminals. AgentRelay
+routes explicit messages; it does not forward every piece of assistant prose.
 
-## Quick start
+Built and maintained by [Hari Naralasetty](https://github.com/harinaralasetty).
+This repository is the **local Python/MCP implementation** formerly called PeerCourier;
+it is independent of other products named Agent Relay. The Python distribution is
+`agentrelay-local`, the command is `agentrelay`, and installation is from this source
+repository. **`pip install agentrelay` installs a different project.**
 
-Requires macOS or Linux, Python 3.12+, [uv](https://docs.astral.sh/uv/), and authenticated
-local installations of both [Codex CLI](https://learn.chatgpt.com/codex) and
-[Claude Code](https://code.claude.com/docs/en/overview). Choose models available in
-your account. No provider credentials are stored in this repository.
+[Quick start](#quick-start-connect-codex-cli-and-claude-code) ·
+[Your own conversation](#start-your-own-conversation) ·
+[MCP tools](#mcp-tools-and-other-runtimes) ·
+[Limitations](#limitations-and-permissions) ·
+[Verified results](docs/verification.md)
 
-```sh
-git clone https://github.com/harinaralasetty/peercourier.git
-cd peercourier
-uv sync --locked
-uv run peercourier demo .peercourier/first --initiator cedar \
-  --codex-model gpt-6-luna --claude-model haiku
-```
+## What AgentRelay does
 
-This uses provider quota. `cedar` is the Codex peer, `birch` the Claude peer.
-The demo exchanges a request, clarification, numbers, calculated answer, and final
-message; it exits successfully only after all five messages are completed and
-explicitly acknowledged. Run the reverse direction in a **new** directory:
-
-```sh
-uv run peercourier demo .peercourier/reverse --initiator birch \
-  --codex-model gpt-6-luna --claude-model haiku
-```
-
-Private tokens, the mailbox and provider-session records stay under that ignored
-state directory. Initialization never overwrites a config. The repository is ready
-to install from source or a locally built wheel; no PyPI release is claimed.
-
-## Use your own task
-
-```sh
-uv run peercourier init .peercourier/my-task
-uv run peercourier run .peercourier/my-task/config.json --peer cedar \
-  --prompt "In conversation demo, send birch a question about a naming convention."
-uv run peercourier inspect .peercourier/my-task/config.json
-```
-
-Edit the generated config to choose models, allowed recipients and limits before
-the first run. `run` stops when owned queues drain; `run --watch` polls idle
-mailboxes until cancelled or the configured wall-time limit expires. Healthy
-sessions resume on later runs. Uncertain deliveries are held for administrator
-review and produce a nonzero exit; they are never automatically retried.
-
-After investigating an uncertain outcome, record your decision without redispatch:
-
-```sh
-uv run peercourier resolve .peercourier/my-task/config.json MESSAGE_ID --outcome failed
-```
-
-Use `completed` only when your review establishes completion. This administrative
-command does not invent a recipient acknowledgment or rerun a provider turn.
-
-## MCP tools
-
-| Tool | Purpose |
+| Capability | Behavior |
 |---|---|
-| `peer_list` | List permitted peers and their runtime state |
-| `peer_send` | Persist an addressed message with a unique idempotency key |
-| `peer_inbox` | Read this peer's unacknowledged messages |
-| `peer_ack` | Explicitly acknowledge a received message |
-| `peer_status` | Inspect delivery separately from acknowledgment |
+| Two-way agent conversations | Either peer can initiate, ask for clarification, or send a linked reply |
+| Durable local mailbox | SQLite persists addressed messages, delivery state, and explicit acknowledgments |
+| Session continuity | Healthy Codex and Claude Code sessions resume on subsequent turns and runs |
+| Controlled routing | Each peer has its own identity/token, permitted recipients, and conversation membership |
+| Duplicate protection | Reusing an idempotency key with the same message returns the original; conflicting reuse fails |
+| Delivery supervision | Idle managed peers receive input; each peer's turns are serialized |
+| Provider-neutral interface | Other runtimes can use the five MCP tools or implement a runtime adapter |
 
-To connect another MCP-capable runtime, launch a per-peer server with:
+The included adapters run **managed sessions**, separate from existing desktop chats
+and native subagent trees. They limit the peers to mailbox communication for this
+initial release; this is a conversation bridge, not a general coding-task runner.
+
+```mermaid
+flowchart LR
+    C[Codex CLI peer] <-->|MCP tools| MC[Codex peer mailbox server]
+    A[Claude Code peer] <-->|MCP tools| MA[Claude peer mailbox server]
+    MC <--> DB[(Local SQLite mailbox)]
+    MA <--> DB
+    DB --> S[Delivery supervisor]
+    S -->|input turns| C
+    S -->|input turns| A
+```
+
+## Quick start: connect Codex CLI and Claude Code
+
+### 1. Check prerequisites
+
+- **macOS or Linux** and **Python 3.12+**. Windows is not currently supported.
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) for the Python environment.
+- Installed, authenticated [Codex CLI](https://learn.chatgpt.com/codex) and
+  [Claude Code](https://code.claude.com/docs/en/overview).
+- Access to the models you select in each CLI account. Desktop model availability
+  can differ from CLI availability.
+
+Check that `uv --version`, `codex --version`, and `claude --version` work in your
+terminal. Follow each provider's sign-in instructions before running the demo.
+AgentRelay uses those local CLI logins; it does not supply or store provider
+credentials in the repository. The model calls still go to their respective providers.
+
+### 2. Install from source
+
+```sh
+git clone https://github.com/harinaralasetty/agentrelay.git
+cd agentrelay
+uv sync --locked --python 3.12
+uv run agentrelay --help
+```
+
+No PyPI release of `agentrelay-local` is claimed. You can also build a local wheel with `uv build`.
+
+### 3. Run a small live conversation
+
+```sh
+uv run agentrelay demo .agentrelay/first --initiator cedar \
+  --codex-model gpt-6-luna --claude-model haiku
+```
+
+This consumes provider quota. The example models were used in this project's live
+checks; replace them with supported models for your accounts. Both included adapters
+use low reasoning effort.
+
+`cedar` is the Codex peer and `birch` is the Claude Code peer. The demo requires this
+five-message exchange:
+
+1. Codex asks Claude to request two numbers before adding them.
+2. Claude asks which numbers to add.
+3. Codex supplies 2 and 3.
+4. Claude replies that the sum is 5.
+5. Codex sends a final verification; Claude acknowledges it and stops.
+
+The command prints a JSON report and exits 0 only when all five expected messages
+have explicit recipient acknowledgments and correct reply links, text, and final
+closure, with no runtime errors. A reply consumed during an active turn may remain
+`stored` because it needed no separate dispatch. Inspect the saved transcript with:
+
+```sh
+uv run agentrelay inspect .agentrelay/first/config.json
+```
+
+To let Claude initiate, use a **new state directory**:
+
+```sh
+uv run agentrelay demo .agentrelay/reverse --initiator birch \
+  --codex-model gpt-6-luna --claude-model haiku
+```
+
+Initialization refuses to overwrite a config. State directories contain private
+peer tokens, mailbox transcripts, and provider-session records; `.agentrelay/` is
+ignored by Git. Keep any state you place elsewhere out of version control too.
+
+## Start your own conversation
+
+Create a separate workspace and choose models explicitly:
+
+```sh
+uv run agentrelay init .agentrelay/my-task \
+  --codex-model gpt-6-luna --claude-model haiku
+```
+
+Before the first run, edit `.agentrelay/my-task/config.json` to choose the
+conversation ID, models, permitted recipients, and limits. The generated conversation
+ID is `demo`; use that ID in prompts unless you change it in the config.
+
+```sh
+uv run agentrelay run .agentrelay/my-task/config.json --peer cedar \
+  --prompt "In conversation demo, send birch this question: Should a Python function that returns a boolean start with is_? Ask for one example, then send a final=true message after the answer."
+uv run agentrelay inspect .agentrelay/my-task/config.json
+```
+
+Replace the prompt with a small discussion task. The agents choose when to send
+messages; a completed provider turn alone does not establish that the conversation
+answered your question correctly.
+
+`run` manages both configured adapters, starts each peer when it has input, delivers
+queued messages, and stops when the owned queues drain. Healthy sessions resume on later runs. To process messages that
+arrive while the supervisor is idle, keep it running with:
+
+```sh
+uv run agentrelay run .agentrelay/my-task/config.json --watch
+```
+
+Watch mode stops on cancellation or the configured wall-time limit. Configuration
+controls `max_messages`, per-peer `max_turns`, `max_seconds`, and `max_cost_usd`.
+The cost setting uses Claude's budget/reporting; **it does not impose a Codex dollar
+cap**. See the [delivery and budget contract](docs/architecture.md#limits-and-trust).
+
+## Delivery failures and recovery
+
+Delivery and acknowledgment are separate. `completed` means the provider returned
+a successful turn; `acknowledged` means the recipient explicitly called `peer_ack`.
+Neither proves semantic correctness.
+
+Interrupted or ambiguous deliveries become `uncertain`. They are held for review,
+produce a nonzero exit, and are never automatically retried. Inspect the transcript
+and provider outcome before recording an administrative decision:
+
+```sh
+uv run agentrelay resolve .agentrelay/my-task/config.json MESSAGE_ID --outcome failed
+```
+
+Use `--outcome completed` only when your review establishes completion. Resolution
+does not invent an acknowledgment or rerun a provider turn. After investigation,
+issue any follow-up as a distinct new task.
+
+## MCP tools and other runtimes
+
+Each registered peer receives the same tools through its own stdio MCP server:
+
+| Tool | What the agent can do |
+|---|---|
+| `peer_list` | Discover permitted peers and their runtime state |
+| `peer_send` | Store an addressed message; use `reply_to` for replies and `final=true` to close |
+| `peer_inbox` | Read its unacknowledged messages |
+| `peer_ack` | Explicitly acknowledge a received message |
+| `peer_status` | Check delivery state separately from acknowledgment |
+
+The managed Codex and Claude Code adapters configure MCP automatically. For another
+MCP-capable client, first register its identity, allowed routes, and conversation in
+the shared store. Then configure its per-peer server using this Claude-style shape:
 
 ```json
 {
   "mcpServers": {
-    "peercourier": {
-      "command": "/absolute/path/to/peercourier/.venv/bin/python",
-      "args": ["-m", "peercourier.mcp_server"],
+    "agentrelay": {
+      "command": "/absolute/path/to/agentrelay/.venv/bin/python",
+      "args": ["-m", "agentrelay.mcp_server"],
       "env": {
-        "PEERCOURIER_DB": "/absolute/path/to/state/mail.sqlite",
-        "PEERCOURIER_PEER": "registered-peer-id",
-        "PEERCOURIER_TOKEN": "generated-private-peer-token"
+        "AGENTRELAY_DB": "/absolute/path/to/state/mail.sqlite",
+        "AGENTRELAY_PEER": "registered-peer-id",
+        "AGENTRELAY_TOKEN": "generated-private-peer-token"
       }
     }
   }
 }
 ```
 
-The administrator must register that identity, permitted routes and conversation
-first. Each client connects to the **same database** using its own identity. MCP
-access provides mailbox tools; idle wake also requires a runtime adapter/supervisor.
-For Codex, use its TOML MCP configuration equivalent rather than this Claude-style
-JSON configuration.
+These are placeholders, not credentials. Every peer connects to the **same database**
+with its own identity and token. Other clients may need a different configuration
+shape; Codex uses TOML. Mailbox access alone does not wake an idle agent: automatic
+delivery needs a runtime adapter and supervisor. To add an adapter, follow the
+[contribution guide](CONTRIBUTING.md) and [architecture](docs/architecture.md).
 
-## Development and boundaries
+## Limitations and permissions
+
+- **No arbitrary desktop attachment:** existing Codex/Claude chats and native
+  subagents are not automatically connected. Native parent-to-child relay remains
+  an extension point.
+- **Limited task tools:** the included adapters disable unrelated coding, shell,
+  browsing, application, and MCP tools. Peer messages do not grant permissions.
+  Codex's read-only sandbox still permits file reads; use synthetic workspaces.
+- **Trusted local use:** peer tokens help prevent accidental spoofing, but this is
+  not isolation against other processes belonging to the same OS user or a hosted
+  multi-tenant service.
+- **Provider dependencies:** authentication, available models, quotas, costs, and
+  CLI protocol changes still apply. Local storage does not mean offline inference.
+- **Bounded conversations:** messages have a 16,000-character cap and configured
+  message, turn, and time limits. A final message closes the whole conversation.
+
+## Verification, development, and support
+
+The [verification record](docs/verification.md) documents automated tests,
+small live conversations in both directions, and session-resume checks, including
+installed CLI versions and coverage limits. Automated tests do not call models.
 
 ```sh
 uv run pytest -q
@@ -107,13 +238,19 @@ uv run ruff format --check .
 uv build
 ```
 
-Tests do not call models. See [development workflow](CONTRIBUTING.md),
-[architecture and limitations](docs/architecture.md), and
-[verification record](docs/verification.md).
+Read the [development workflow](CONTRIBUTING.md) before changing adapters or routing.
+Report reproducible problems through [GitHub issues](https://github.com/harinaralasetty/agentrelay/issues),
+with versions and redacted errors; exclude tokens and private transcripts.
+[MIT licensed](LICENSE).
 
-This is an initial local release. Tokens are intended for peers under one trusted
-OS user, not hostile multi-tenant isolation. Codex cost is bounded by activity
-limits, not an enforced dollar budget. Peer messages never grant extra permissions.
-Native desktop/subagent integration remains an extension point.
+## Migrating from PeerCourier
 
-MIT licensed.
+The project is now AgentRelay. Use the new clone URL, `agentrelay` command,
+`agentrelay` Python module/MCP server name, and `AGENTRELAY_*` MCP environment
+variables. The distribution name is `agentrelay-local`.
+
+Existing `config.json` and SQLite mailbox formats are unchanged. You can retain an
+old `.peercourier/` state directory and pass its config path to the new command;
+both old and new default state directories are ignored. Stop the old supervisor
+before switching, update any custom MCP configuration, and run `uv sync --locked`
+in the updated checkout. Do not initialize over an existing config.

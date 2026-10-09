@@ -1,6 +1,6 @@
 # Architecture and delivery contract
 
-PeerCourier is a local, provider-neutral mailbox with optional runtime supervision.
+AgentRelay is a local, provider-neutral mailbox with optional runtime supervision.
 Every peer gets the same MCP tool contract. The initial runtime adapters support
 Codex app-server roots and Claude Code CLI sessions; additional runtimes can use
 the MCP mailbox directly or implement the Python runtime interface.
@@ -34,6 +34,10 @@ an exact replay returns the original message, while conflicting reuse fails.
 | `acknowledged` | Recipient explicitly called `peer_ack`; it is an agent assertion |
 | `uncertain` | Dispatch failed, was cancelled, or supervisor restarted mid-delivery |
 | `failed` | Work refused before dispatch, such as a turn cap |
+
+A recipient may read and acknowledge a `stored` message during its current turn.
+The supervisor then skips a separate dispatch; the message can remain `stored`
+with `acknowledged=true`. This is distinct from a completed provider dispatch.
 
 Ordinary assistant prose is never forwarded. `peer_send` returns immediately after
 storage, so an A→B→A exchange cannot deadlock inside synchronous tool calls.
@@ -70,7 +74,7 @@ their owned process groups.
 
 These are managed peers, not entries in a desktop app's native subagent tree.
 Direct external input to native Codex V2 children is restricted; an owning parent
-must relay messages using its native collaboration interface. PeerCourier does
+must relay messages using its native collaboration interface. AgentRelay does
 not implement that parent relay or attach to arbitrary already-running desktop
 chats. MCP notifications alone do not provide idle wake.
 
@@ -89,7 +93,7 @@ chats. MCP notifications alone do not provide idle wake.
   verification belongs above the transport.
 - API/account limits, organizational policy and changing CLI interfaces still
   apply. Use provider-supported credentials. No credentials are supplied or
-  extracted by PeerCourier; it uses locally installed authenticated CLIs.
+  extracted by AgentRelay; it uses locally installed authenticated CLIs.
 
 ## Primary references
 

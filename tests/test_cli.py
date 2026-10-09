@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-from peercourier.cli import initialize, load, verify_demo
+from agentrelay.cli import initialize, load, verify_demo
 
 
 def test_init_is_private_and_never_overwrites_config(tmp_path):
@@ -24,7 +24,7 @@ def test_inspect_has_no_secrets_and_does_not_call_provider(tmp_path):
     path = initialize(tmp_path / "state", "not-real", "not-real")
     config = json.loads(path.read_text())
     result = subprocess.run(
-        [sys.executable, "-m", "peercourier", "inspect", str(path)],
+        [sys.executable, "-m", "agentrelay", "inspect", str(path)],
         capture_output=True,
         text=True,
         timeout=10,
@@ -47,7 +47,8 @@ def test_demo_requires_full_acknowledged_completed_exchange():
     messages = []
     texts = [
         "Please ask me 'Which two numbers should I add?' Then add the two numbers I provide "
-        "and reply using 'The sum is <number>.'",
+        "and reply using 'The sum is <number>.' with final=false. "
+        "Wait for my final verification, then acknowledge it and stop.",
         "Which two numbers should I add?",
         "Add 2 and 3.",
         "The sum is 5.",
@@ -79,4 +80,34 @@ def test_demo_requires_full_acknowledged_completed_exchange():
     assert not verify_demo(messages)
     messages[-1]["acknowledged"] = True
     messages[-1]["reply_to"] = "wrong"
+    assert not verify_demo(messages)
+
+
+def test_demo_accepts_consumed_mailbox_messages_but_rejects_uncertain_delivery():
+    from agentrelay.cli import DEMO_TEXTS
+
+    messages = [
+        {
+            "id": str(index),
+            "sender": "cedar" if index % 2 == 0 else "birch",
+            "recipient": "birch" if index % 2 == 0 else "cedar",
+            "conversation_id": "demo",
+            "reply_to": str(index - 1) if index else None,
+            "final": index == 4,
+            "status": "stored" if index == 1 else "completed",
+            "acknowledged": True,
+            "text": text,
+        }
+        for index, text in enumerate(DEMO_TEXTS)
+    ]
+    # A peer may consume and ACK the mailbox within its active turn, before a new dispatch.
+    assert verify_demo(messages)
+    messages[1]["acknowledged"] = False
+    assert not verify_demo(messages)
+    messages[1]["acknowledged"] = True
+    for state in ("uncertain", "failed", "submitted"):
+        messages[1]["status"] = state
+        assert not verify_demo(messages)
+    messages[1]["status"] = "completed"
+    messages[3]["final"] = True
     assert not verify_demo(messages)

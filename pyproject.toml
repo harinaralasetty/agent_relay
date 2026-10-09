@@ -3,17 +3,33 @@ requires = ["hatchling>=1.27,<2"]
 build-backend = "hatchling.build"
 
 [project]
-name = "peercourier"
+name = "agentrelay-local"
 version = "0.1.0"
-description = "Durable local conversations between agents from different runtimes"
+description = "Local agent-to-agent messaging over MCP, with Codex CLI and Claude Code adapters"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
 authors = [{name = "Hari Naralasetty"}]
 dependencies = ["mcp>=1.20,<2"]
 
+keywords = ["agent-to-agent", "mcp", "codex", "claude-code", "multi-agent", "sqlite"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Repository = "https://github.com/harinaralasetty/agentrelay"
+Documentation = "https://github.com/harinaralasetty/agentrelay#readme"
+Issues = "https://github.com/harinaralasetty/agentrelay/issues"
+
 [project.scripts]
-peercourier = "peercourier.cli:main"
+agentrelay = "agentrelay.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8,<9", "pytest-asyncio>=0.24,<2", "ruff>=0.11,<1", "build>=1.2,<2"]
@@ -29,4 +45,4 @@ line-length = 100
 select = ["E", "F", "I", "B", "UP"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/peercourier"]
+packages = ["src/agentrelay"]

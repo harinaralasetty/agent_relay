@@ -7,9 +7,10 @@ dist/
 *.egg-info/
 .local/
 .planning/
-.peercourier/
+.agentrelay/
 .env
 .env.*
 *.sqlite*
 *.db*
 .DS_Store
+.peercourier/

@@ -4,7 +4,7 @@ import sys
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-from peercourier.store import Store
+from agentrelay.store import Store
 
 
 async def test_two_stdio_servers_share_authenticated_mailbox(tmp_path):
@@ -17,8 +17,8 @@ async def test_two_stdio_servers_share_authenticated_mailbox(tmp_path):
     def params(peer, token):
         return StdioServerParameters(
             command=sys.executable,
-            args=["-m", "peercourier.mcp_server"],
-            env={"PEERCOURIER_DB": str(path), "PEERCOURIER_PEER": peer, "PEERCOURIER_TOKEN": token},
+            args=["-m", "agentrelay.mcp_server"],
+            env={"AGENTRELAY_DB": str(path), "AGENTRELAY_PEER": peer, "AGENTRELAY_TOKEN": token},
         )
 
     async with stdio_client(params("alpha", "secret-a")) as (ar, aw):
@@ -63,11 +63,11 @@ async def test_invalid_mcp_identity_cannot_read_mail(tmp_path):
     Store(path).register("alpha", "correct-secret", [])
     params = StdioServerParameters(
         command=sys.executable,
-        args=["-m", "peercourier.mcp_server"],
+        args=["-m", "agentrelay.mcp_server"],
         env={
-            "PEERCOURIER_DB": str(path),
-            "PEERCOURIER_PEER": "alpha",
-            "PEERCOURIER_TOKEN": "wrong-secret",
+            "AGENTRELAY_DB": str(path),
+            "AGENTRELAY_PEER": "alpha",
+            "AGENTRELAY_TOKEN": "wrong-secret",
         },
     )
     async with stdio_client(params) as (r, w):

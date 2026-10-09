@@ -6,7 +6,7 @@ import json
 import os
 import signal
 
-from peercourier.runtime import RuntimeConfig, RuntimeFailure, TurnResult
+from agentrelay.runtime import RuntimeConfig, RuntimeFailure, TurnResult
 
 _MAX_LINE = 1024 * 1024
 _MAX_EVENTS = 256
@@ -67,7 +67,7 @@ class CodexRuntime:
         disabled = []
         for server in servers:
             name = server["name"]
-            if name == "peercourier":
+            if name == "agentrelay":
                 raise RuntimeFailure("Reserved peer MCP server already configured")
             # Override paths do not parse quoted dotted keys. A single TOML map
             # handles dashed/dotted names and supplies valid disabled transports.
@@ -75,7 +75,7 @@ class CodexRuntime:
         env = ",".join(f"{json.dumps(k)}={json.dumps(v)}" for k, v in self.config.mcp_env.items())
         approvals = ",".join(f'{name}={{approval_mode="approve"}}' for name in _MAILBOX_TOOLS)
         peer = (
-            "peercourier={command="
+            "agentrelay={command="
             + json.dumps(self.config.mcp_command)
             + ",args="
             + json.dumps(self.config.mcp_args)
@@ -219,7 +219,7 @@ class CodexRuntime:
                         asyncio.create_task(self._drain_stderr()),
                     ]
                     await self._request(
-                        "initialize", {"clientInfo": {"name": "peercourier", "version": "0.1.0"}}
+                        "initialize", {"clientInfo": {"name": "agentrelay", "version": "0.1.0"}}
                     )
                     await self._send({"method": "initialized", "params": {}})
                     params = {

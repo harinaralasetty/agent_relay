@@ -2,9 +2,9 @@ import asyncio
 
 import pytest
 
-from peercourier.runtime import RuntimeFailure, TurnResult
-from peercourier.store import Store
-from peercourier.supervisor import Supervisor
+from agentrelay.runtime import RuntimeFailure, TurnResult
+from agentrelay.store import Store
+from agentrelay.supervisor import Supervisor
 
 
 class TestRuntime:

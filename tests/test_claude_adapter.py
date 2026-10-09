@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from peercourier.runtime import RuntimeConfig, RuntimeFailure
+from agentrelay.runtime import RuntimeConfig, RuntimeFailure
 
 
 @pytest.fixture
@@ -46,7 +46,7 @@ if mode == 'exit': sys.exit(2)
         "haiku",
         str(tmp_path),
         "/usr/bin/python3",
-        ["-m", "peercourier.mcp"],
+        ["-m", "agentrelay.mcp"],
         {"PEER_TEST_SECRET": "mcp-only"},
         executable=str(script),
         timeout=1.0,
@@ -55,7 +55,7 @@ if mode == 'exit': sys.exit(2)
 
 @pytest.mark.asyncio
 async def test_session_and_tool_isolation(fake_cli, monkeypatch):
-    from peercourier.adapters.claude import ClaudeRuntime
+    from agentrelay.adapters.claude import ClaudeRuntime
 
     monkeypatch.delenv("PEER_TEST_SECRET", raising=False)
     runtime = ClaudeRuntime(fake_cli)
@@ -82,8 +82,8 @@ async def test_session_and_tool_isolation(fake_cli, monkeypatch):
     assert "peer mailbox" in args[args.index("--system-prompt") + 1]
     assert "--dangerously-skip-permissions" not in args
     mcp = json.loads(args[args.index("--mcp-config") + 1])
-    assert list(mcp["mcpServers"]) == ["peercourier"]
-    assert mcp["mcpServers"]["peercourier"]["env"]["PEER_TEST_SECRET"] == "mcp-only"
+    assert list(mcp["mcpServers"]) == ["agentrelay"]
+    assert mcp["mcpServers"]["agentrelay"]["env"]["PEER_TEST_SECRET"] == "mcp-only"
     assert calls[0]["env_secret"] is None
     assert calls[0]["stdin"] == "hello"
 
@@ -91,7 +91,7 @@ async def test_session_and_tool_isolation(fake_cli, monkeypatch):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("mode", ["malformed", "mismatch", "error", "max_turns", "exit"])
 async def test_failed_turn_is_not_retried(fake_cli, monkeypatch, mode):
-    from peercourier.adapters.claude import ClaudeRuntime
+    from agentrelay.adapters.claude import ClaudeRuntime
 
     monkeypatch.setenv("FAKE_CLAUDE_MODE", mode)
     runtime = ClaudeRuntime(fake_cli)
@@ -106,7 +106,7 @@ async def test_failed_turn_is_not_retried(fake_cli, monkeypatch, mode):
 
 @pytest.mark.asyncio
 async def test_timeout_stops_owned_process_group(fake_cli, monkeypatch):
-    from peercourier.adapters.claude import ClaudeRuntime
+    from agentrelay.adapters.claude import ClaudeRuntime
 
     monkeypatch.setenv("FAKE_CLAUDE_MODE", "timeout")
     runtime = ClaudeRuntime(fake_cli)
@@ -131,7 +131,7 @@ async def test_timeout_stops_owned_process_group(fake_cli, monkeypatch):
 async def test_cancellation_closes_process_and_marks_session_uncertain(fake_cli, monkeypatch):
     import asyncio
 
-    from peercourier.adapters.claude import ClaudeRuntime
+    from agentrelay.adapters.claude import ClaudeRuntime
 
     monkeypatch.setenv("FAKE_CLAUDE_MODE", "timeout")
     runtime = ClaudeRuntime(fake_cli)
@@ -158,7 +158,7 @@ async def test_cancellation_closes_process_and_marks_session_uncertain(fake_cli,
 async def test_explicit_resume_uses_recorded_session_on_first_turn(fake_cli):
     from dataclasses import replace
 
-    from peercourier.adapters.claude import ClaudeRuntime
+    from agentrelay.adapters.claude import ClaudeRuntime
 
     sid = "572f3406-1f1e-4162-ade9-b77aee9fc701"
     runtime = ClaudeRuntime(replace(fake_cli, resume_session=sid))
@@ -175,7 +175,7 @@ async def test_explicit_resume_uses_recorded_session_on_first_turn(fake_cli):
 async def test_invalid_resume_uuid_fails_without_launch(fake_cli):
     from dataclasses import replace
 
-    from peercourier.adapters.claude import ClaudeRuntime
+    from agentrelay.adapters.claude import ClaudeRuntime
 
     runtime = ClaudeRuntime(replace(fake_cli, resume_session="not-a-session"))
     with pytest.raises(RuntimeFailure, match="UUID"):
@@ -185,7 +185,7 @@ async def test_invalid_resume_uuid_fails_without_launch(fake_cli):
 
 @pytest.mark.asyncio
 async def test_large_stdout_fails_closed(fake_cli, monkeypatch):
-    from peercourier.adapters.claude import ClaudeRuntime
+    from agentrelay.adapters.claude import ClaudeRuntime
 
     monkeypatch.setenv("FAKE_CLAUDE_MODE", "overflow")
     runtime = ClaudeRuntime(fake_cli)
@@ -199,7 +199,7 @@ async def test_large_stdout_fails_closed(fake_cli, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_large_stderr_is_drained_without_blocking(fake_cli, monkeypatch):
-    from peercourier.adapters.claude import ClaudeRuntime
+    from agentrelay.adapters.claude import ClaudeRuntime
 
     monkeypatch.setenv("FAKE_CLAUDE_MODE", "stderr")
     runtime = ClaudeRuntime(fake_cli)

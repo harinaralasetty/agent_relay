@@ -9,18 +9,19 @@ import sys
 from dataclasses import replace
 from pathlib import Path
 
-from peercourier.adapters.claude import ClaudeRuntime
-from peercourier.adapters.codex import CodexRuntime
-from peercourier.runtime import RuntimeConfig
-from peercourier.store import Store, identifier
-from peercourier.supervisor import Supervisor
+from agentrelay.adapters.claude import ClaudeRuntime
+from agentrelay.adapters.codex import CodexRuntime
+from agentrelay.runtime import RuntimeConfig
+from agentrelay.store import Store, identifier
+from agentrelay.supervisor import Supervisor
 
 DEFAULT_CODEX_MODEL = "gpt-6-luna"
 DEFAULT_CLAUDE_MODEL = "haiku"
 RUNTIMES = {"codex": CodexRuntime, "claude": ClaudeRuntime}
 DEMO_TEXTS = [
     "Please ask me 'Which two numbers should I add?' Then add the two numbers I provide "
-    "and reply using 'The sum is <number>.'",
+    "and reply using 'The sum is <number>.' with final=false. "
+    "Wait for my final verification, then acknowledge it and stop.",
     "Which two numbers should I add?",
     "Add 2 and 3.",
     "The sum is 5.",
@@ -92,11 +93,11 @@ def make_runtimes(config: dict, store: Store) -> dict:
             model=definition["model"],
             cwd=str(workspace),
             mcp_command=sys.executable,
-            mcp_args=["-m", "peercourier.mcp_server"],
+            mcp_args=["-m", "agentrelay.mcp_server"],
             mcp_env={
-                "PEERCOURIER_DB": str(store.path),
-                "PEERCOURIER_PEER": peer,
-                "PEERCOURIER_TOKEN": definition["token"],
+                "AGENTRELAY_DB": str(store.path),
+                "AGENTRELAY_PEER": peer,
+                "AGENTRELAY_TOKEN": definition["token"],
             },
             timeout=definition.get("timeout", 90),
             effort="low",
@@ -130,11 +131,13 @@ async def run(path: Path, initial: dict[str, str] | None, watch: bool = False) -
 
 
 def verify_demo(messages: list[dict]) -> bool:
-    """A successful demo proves the whole exchange, not just a final message send."""
+    """Require the complete ACKed exchange, allowing reads during an active turn."""
     if len(messages) != 5 or not messages[-1]["final"]:
         return False
     for index, message in enumerate(messages):
-        if message["status"] != "completed" or not message["acknowledged"]:
+        if message["status"] not in {"stored", "completed"} or not message["acknowledged"]:
+            return False
+        if message["final"] != (index == len(DEMO_TEXTS) - 1):
             return False
         if message["text"].strip() != DEMO_TEXTS[index]:
             return False
@@ -151,7 +154,7 @@ def verify_demo(messages: list[dict]) -> bool:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="PeerCourier local agent conversations")
+    parser = argparse.ArgumentParser(description="AgentRelay local agent conversations")
     commands = parser.add_subparsers(dest="command", required=True)
     init = commands.add_parser("init", help="Create private local config (never overwrites)")
     init.add_argument("directory", type=Path)
@@ -173,11 +176,11 @@ def main() -> None:
     demo.add_argument("--initiator", choices=["cedar", "birch"], default="cedar")
     demo.add_argument("--codex-model", default=DEFAULT_CODEX_MODEL)
     demo.add_argument("--claude-model", default=DEFAULT_CLAUDE_MODEL)
-    commands.add_parser("mcp", help="Run per-peer stdio MCP using PEERCOURIER_* environment")
+    commands.add_parser("mcp", help="Run per-peer stdio MCP using AGENTRELAY_* environment")
     args = parser.parse_args()
     try:
         if args.command == "mcp":
-            from peercourier.mcp_server import main as mcp_main
+            from agentrelay.mcp_server import main as mcp_main
 
             mcp_main()
         elif args.command == "init":
@@ -206,7 +209,7 @@ def main() -> None:
             if report["errors"]:
                 raise SystemExit(1)
     except (ValueError, OSError) as exc:
-        print(f"PeerCourier: {type(exc).__name__}: {exc}", file=sys.stderr)
+        print(f"AgentRelay: {type(exc).__name__}: {exc}", file=sys.stderr)
         raise SystemExit(1) from None
 
 

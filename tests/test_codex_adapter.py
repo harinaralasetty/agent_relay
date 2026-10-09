@@ -5,7 +5,10 @@ from dataclasses import replace
 
 import pytest
 
-from peercourier.runtime import RuntimeConfig, RuntimeFailure
+from agentrelay.runtime import RuntimeConfig, RuntimeFailure
+
+# Allow cold CLI process startup; timeout behavior tests set a short turn deadline separately.
+FAKE_STARTUP_TIMEOUT = 10
 
 
 @pytest.fixture
@@ -106,8 +109,8 @@ def config(fake_codex, tmp_path, monkeypatch):
         str(tmp_path),
         "python",
         ["-m", "peer"],
-        {"PEERCOURIER_PEER_ID": "alice", "TOKEN": "private"},
-        timeout=2,
+        {"AGENTRELAY_PEER_ID": "alice", "TOKEN": "private"},
+        timeout=FAKE_STARTUP_TIMEOUT,
         executable=str(fake_codex),
     )
 
@@ -116,7 +119,7 @@ async def test_one_root_persists_with_private_mcp_and_denied_approval(
     fake_codex, tmp_path, monkeypatch
 ):
     # Removing the thread reuse, MCP overrides, or approval reply breaks this boundary contract.
-    from peercourier.adapters.codex import CodexRuntime
+    from agentrelay.adapters.codex import CodexRuntime
 
     runtime = CodexRuntime(config(fake_codex, tmp_path, monkeypatch))
     try:
@@ -136,12 +139,12 @@ async def test_one_root_persists_with_private_mcp_and_denied_approval(
     mcp_override = next(arg for arg in argv if arg.startswith("mcp_servers="))
     mcp_config = tomllib.loads(mcp_override)["mcp_servers"]
     assert mcp_config["code-review"] == {"command": "/usr/bin/false", "enabled": False}
-    assert mcp_config["peercourier"]["command"] == "python"
-    assert mcp_config["peercourier"]["args"] == ["-m", "peer"]
-    assert mcp_config["peercourier"]["env"] == {"PEERCOURIER_PEER_ID": "alice", "TOKEN": "private"}
+    assert mcp_config["agentrelay"]["command"] == "python"
+    assert mcp_config["agentrelay"]["args"] == ["-m", "peer"]
+    assert mcp_config["agentrelay"]["env"] == {"AGENTRELAY_PEER_ID": "alice", "TOKEN": "private"}
     expected_tools = ["peer_list", "peer_send", "peer_inbox", "peer_ack", "peer_status"]
-    assert mcp_config["peercourier"]["enabled_tools"] == expected_tools
-    assert mcp_config["peercourier"]["tools"] == {
+    assert mcp_config["agentrelay"]["enabled_tools"] == expected_tools
+    assert mcp_config["agentrelay"]["tools"] == {
         name: {"approval_mode": "approve"} for name in expected_tools
     }
     assert 'approval_policy="never"' in argv
@@ -173,7 +176,7 @@ async def test_one_root_persists_with_private_mcp_and_denied_approval(
 async def test_uncertain_turn_closes_process_without_retry(
     fake_codex, tmp_path, monkeypatch, prompt
 ):
-    from peercourier.adapters.codex import CodexRuntime
+    from agentrelay.adapters.codex import CodexRuntime
 
     runtime = CodexRuntime(config(fake_codex, tmp_path, monkeypatch))
     await runtime.start()
@@ -190,9 +193,9 @@ async def test_uncertain_turn_closes_process_without_retry(
 
 
 async def test_existing_peer_server_configuration_fails_closed(fake_codex, tmp_path, monkeypatch):
-    from peercourier.adapters.codex import CodexRuntime
+    from agentrelay.adapters.codex import CodexRuntime
 
-    monkeypatch.setenv("FAKE_MCP", "peercourier")
+    monkeypatch.setenv("FAKE_MCP", "agentrelay")
     runtime = CodexRuntime(config(fake_codex, tmp_path, monkeypatch))
     with pytest.raises(RuntimeFailure):
         await runtime.start()
@@ -201,7 +204,7 @@ async def test_existing_peer_server_configuration_fails_closed(fake_codex, tmp_p
 
 
 async def test_close_never_signals_released_process_group(fake_codex, tmp_path, monkeypatch):
-    from peercourier.adapters.codex import CodexRuntime
+    from agentrelay.adapters.codex import CodexRuntime
 
     runtime = CodexRuntime(config(fake_codex, tmp_path, monkeypatch))
     await runtime.start()
@@ -210,14 +213,14 @@ async def test_close_never_signals_released_process_group(fake_codex, tmp_path, 
     def unexpected_signal(*args):
         pytest.fail("close signaled a released process group")
 
-    monkeypatch.setattr("peercourier.adapters.codex.os.killpg", unexpected_signal)
+    monkeypatch.setattr("agentrelay.adapters.codex.os.killpg", unexpected_signal)
     await runtime.close()
 
 
 async def test_configured_effort_is_sent_to_turn(fake_codex, tmp_path, monkeypatch):
     from dataclasses import replace
 
-    from peercourier.adapters.codex import CodexRuntime
+    from agentrelay.adapters.codex import CodexRuntime
 
     runtime = CodexRuntime(replace(config(fake_codex, tmp_path, monkeypatch), effort="medium"))
     try:
@@ -231,7 +234,7 @@ async def test_configured_effort_is_sent_to_turn(fake_codex, tmp_path, monkeypat
 
 
 async def test_resume_preserves_root_without_starting_new_thread(fake_codex, tmp_path, monkeypatch):
-    from peercourier.adapters.codex import CodexRuntime
+    from agentrelay.adapters.codex import CodexRuntime
 
     cfg = config(fake_codex, tmp_path, monkeypatch)
     first = CodexRuntime(cfg)
@@ -255,7 +258,7 @@ async def test_resume_preserves_root_without_starting_new_thread(fake_codex, tmp
 
 @pytest.mark.parametrize("root", ["stale", "mismatch"])
 async def test_resume_rejection_never_creates_new_root(fake_codex, tmp_path, monkeypatch, root):
-    from peercourier.adapters.codex import CodexRuntime
+    from agentrelay.adapters.codex import CodexRuntime
 
     runtime = CodexRuntime(replace(config(fake_codex, tmp_path, monkeypatch), resume_session=root))
     with pytest.raises(RuntimeFailure) as failure:
@@ -270,7 +273,7 @@ async def test_resume_rejection_never_creates_new_root(fake_codex, tmp_path, mon
 
 
 async def test_owned_descendant_cannot_continue_after_close(fake_codex, tmp_path, monkeypatch):
-    from peercourier.adapters.codex import CodexRuntime
+    from agentrelay.adapters.codex import CodexRuntime
 
     runtime = CodexRuntime(config(fake_codex, tmp_path, monkeypatch))
     try:

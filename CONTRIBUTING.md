@@ -38,6 +38,6 @@ preserve failed evidence privately. Never automatically retry an ambiguous turn.
 Keep private config, credentials, local paths and raw transcripts out of Git.
 
 To add a runtime, implement `Runtime.start`, `turn`, and `close` from
-`src/peercourier/runtime.py`. Return a stable resumable session ID and explicit errors.
+`src/agentrelay/runtime.py`. Return a stable resumable session ID and explicit errors.
 Add it to the CLI adapter registry and test the actual protocol, session resume,
 output bounds and owned-process cleanup. The mailbox does not need provider changes.

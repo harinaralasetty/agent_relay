@@ -2,7 +2,7 @@ import concurrent.futures
 
 import pytest
 
-from peercourier.store import CourierError, Store
+from agentrelay.store import CourierError, Store
 
 
 @pytest.fixture

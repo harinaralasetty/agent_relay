@@ -4,13 +4,13 @@ import os
 
 from mcp.server.fastmcp import FastMCP
 
-from peercourier.store import Store
+from agentrelay.store import Store
 
 
 def create_server(path: str, peer: str, token: str) -> FastMCP:
     store = Store(path)
     server = FastMCP(
-        "PeerCourier",
+        "AgentRelay",
         instructions=(
             "Use explicit peer_send for messages. It stores a message without waiting for a reply. "
             "Use unique idempotency keys and reply_to IDs. Acknowledge messages with peer_ack. "
@@ -55,9 +55,9 @@ def create_server(path: str, peer: str, token: str) -> FastMCP:
 
 
 def main() -> None:
-    required = ("PEERCOURIER_DB", "PEERCOURIER_PEER", "PEERCOURIER_TOKEN")
+    required = ("AGENTRELAY_DB", "AGENTRELAY_PEER", "AGENTRELAY_TOKEN")
     if not all(os.environ.get(name) for name in required):
-        raise SystemExit("Set PEERCOURIER_DB, PEERCOURIER_PEER and PEERCOURIER_TOKEN")
+        raise SystemExit("Set AGENTRELAY_DB, AGENTRELAY_PEER and AGENTRELAY_TOKEN")
     create_server(*(os.environ[name] for name in required)).run(transport="stdio")
 
 

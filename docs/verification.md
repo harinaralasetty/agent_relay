@@ -71,3 +71,41 @@ universal provider dollar cap. Linux CI runs the credential-free checks; live
 provider behavior was exercised on macOS only.
 
 This record describes measured evidence, not a guarantee that all defects are absent.
+
+## AgentRelay rename qualification — 9 October 2026
+
+The project was renamed from PeerCourier to AgentRelay. Python distribution:
+`agentrelay-local`; module/CLI/MCP server name: `agentrelay`; MCP environment prefix:
+`AGENTRELAY_`. Existing mailbox and config formats were preserved.
+
+| Fresh check after the rename | Observed result |
+|---|---|
+| Automated behavioral suite | 48 passed |
+| Lint, formatting, source distribution and wheel | Passed |
+| Fresh environment installation of the renamed wheel and CLI help | Passed |
+| Codex-initiated updated demo | 5/5 exact linked messages completed and ACKed; 3 turns per peer; exit 0 |
+| Claude-initiated updated demo | 5/5 exact linked messages completed and ACKed; 3 turns per peer; exit 0 |
+| Session continuity within both demos | One provider session per peer; no unresolved deliveries or runtime errors |
+| Independent rename and demo-fix review | Namespace/config/package changes consistent; confirmed issues fixed and reviewed |
+
+Initial rename qualification attempts exposed two demo problems and were retained
+as failed attempts. A peer could read and acknowledge a stored reply while its
+current turn was still active, so no separate supervisor dispatch was needed.
+The old demo checker incorrectly required that message to become `completed`.
+The checker now accepts `stored` only with an explicit recipient ACK and still
+rejects `submitted`, `uncertain` and `failed` states. Exact message count/text,
+reply bindings and final closure remain required; runtime errors still fail the CLI.
+A new regression test failed before the fix and passed afterward.
+
+One agent also marked the sum as final before the verification message. The demo
+request now explicitly requires `final=false` for the sum and a final verification
+from the initiator. Guidance asks peers to return after handling available input,
+leaving future-message delivery to the supervisor. Acknowledgment is still an agent
+assertion; these demo checks establish this specific exchange, not correctness of
+arbitrary tasks. Both fresh runs used new state directories; no ambiguous turn was
+redispatched.
+
+The moved virtual environment had stale executable paths and was rebuilt. A
+fake-CLI startup test initially hit its two-second allowance during cold startup;
+its startup margin is now ten seconds, while the intentional turn timeout remains
+0.1 seconds. Production timeout defaults were unchanged.
