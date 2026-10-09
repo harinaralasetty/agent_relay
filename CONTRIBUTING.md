@@ -22,16 +22,17 @@ flowchart TD
 ```
 
 ```sh
-uv sync --locked --python 3.12
-uv run pytest -q
-uv run ruff check .
-uv run ruff format --check .
+uv sync --locked --python 3.12 --extra models
+uv run --extra models pytest -q
+uv run --extra models ruff check .
+uv run --extra models ruff format --check .
 uv build
 ```
 
-CI never calls a model or needs provider credentials. Runtime adapter tests use small
-fake executables at the external protocol boundary; broker and MCP tests use real
-SQLite connections and real MCP subprocesses.
+CI checks both the standard installation and the optional `models` extra. It never
+calls an external model or needs provider credentials. CLI adapter tests use small
+fake executables; LiteLLM tests exercise an owned local HTTP endpoint with dummy
+credentials. Broker and MCP tests use real SQLite and real MCP subprocesses.
 
 Live tests consume provider quota. Use a new ignored state directory for each demo;
 preserve failed evidence privately. Never automatically retry an ambiguous turn.

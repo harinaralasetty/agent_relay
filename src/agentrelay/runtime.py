@@ -3,6 +3,9 @@
 from dataclasses import dataclass, field
 from typing import Protocol
 
+DEFAULT_TOOL_ROUNDS = 8
+DEFAULT_OUTPUT_TOKENS = 512
+
 
 @dataclass(frozen=True)
 class RuntimeConfig:
@@ -17,6 +20,10 @@ class RuntimeConfig:
     max_budget_usd: float = 0.25
     executable: str | None = None
     resume_session: str | None = None
+    api_key_env: str | None = None
+    api_base: str | None = None
+    max_tool_rounds: int = DEFAULT_TOOL_ROUNDS
+    max_output_tokens: int = DEFAULT_OUTPUT_TOKENS
 
 
 @dataclass(frozen=True)

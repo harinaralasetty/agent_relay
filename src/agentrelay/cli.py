@@ -12,14 +12,30 @@ from pathlib import Path
 from agentrelay.adapters.claude import ClaudeRuntime
 from agentrelay.adapters.codex import CodexRuntime
 from agentrelay.delegation import initialize_delegation, manager_prompt, verify_delegation
+from agentrelay.peers import (
+    DEFAULT_OUTPUT_TOKENS,
+    DEFAULT_TOOL_ROUNDS,
+    SUPPORTED_RUNTIMES,
+    add_peer,
+    configuration_lock,
+    validate,
+)
 from agentrelay.runtime import RuntimeConfig
-from agentrelay.store import Store, identifier
+from agentrelay.store import Store
 from agentrelay.supervisor import Supervisor
 
 DEFAULT_CODEX_MODEL = "gpt-6-luna"
 DEFAULT_CLAUDE_MODEL = "haiku"
 DEFAULT_TEAM_MAX_MESSAGES = 12
-RUNTIMES = {"codex": CodexRuntime, "claude": ClaudeRuntime}
+
+
+def _litellm_runtime(options):
+    from agentrelay.adapters.litellm import LiteLLMRuntime
+
+    return LiteLLMRuntime(options)
+
+
+RUNTIMES = {"codex": CodexRuntime, "claude": ClaudeRuntime, "litellm": _litellm_runtime}
 DEMO_TEXTS = [
     "Please ask me 'Which two numbers should I add?' Then add the two numbers I provide "
     "and reply using 'The sum is <number>.' with final=false. "
@@ -62,24 +78,16 @@ def initialize(directory: Path, codex_model: str, claude_model: str) -> Path:
 
 
 def load(path: Path) -> tuple[dict, Store]:
-    config = json.loads(path.read_text())
-    peers = config.get("peers")
-    if not isinstance(peers, dict) or len(peers) < 2:
-        raise ValueError("Configure at least two peers")
-    identifier(config["conversation_id"])
-    for peer, definition in peers.items():
-        identifier(peer)
-        if definition.get("runtime") not in RUNTIMES:
-            raise ValueError("Unknown runtime; supported runtime adapters: codex, claude")
-        if not definition.get("model") or not definition.get("token"):
-            raise ValueError("Every peer needs a model and a private token")
-        for target in definition["allowed"]:
-            if target not in peers:
-                raise ValueError("Allowed recipient does not exist")
-    store = Store(path.parent / "mail.sqlite")
-    for peer, definition in peers.items():
-        store.register(peer, definition["token"], definition["allowed"])
-    store.conversation(config["conversation_id"], list(peers), config.get("max_messages", 12))
+    path = path.expanduser().resolve()
+    with configuration_lock(path):
+        config = json.loads(path.read_text())
+        validate(config)
+        store = Store(path.parent / "mail.sqlite")
+        for peer, definition in config["peers"].items():
+            store.register(peer, definition["token"], definition["allowed"])
+        store.conversation(
+            config["conversation_id"], list(config["peers"]), config.get("max_messages", 12)
+        )
     return config, store
 
 
@@ -105,8 +113,14 @@ def make_runtimes(config: dict, store: Store) -> dict:
             effort="low",
             max_budget_usd=config.get("limits", {}).get("max_cost_usd", 1.0),
             executable=definition.get("executable"),
+            api_key_env=definition.get("api_key_env"),
+            api_base=definition.get("api_base"),
+            max_tool_rounds=definition.get("max_tool_rounds", DEFAULT_TOOL_ROUNDS),
+            max_output_tokens=definition.get("max_output_tokens", DEFAULT_OUTPUT_TOKENS),
         )
         if previous["session_id"]:
+            if definition["runtime"] != "litellm" and previous["session_id"].startswith("litellm:"):
+                raise ValueError("Recorded API session requires its original runtime")
             options = replace(options, resume_session=previous["session_id"])
         runtimes[peer] = RUNTIMES[definition["runtime"]](options)
     return runtimes
@@ -167,6 +181,17 @@ def main() -> None:
     )
     init.add_argument("--codex-model", default=DEFAULT_CODEX_MODEL)
     init.add_argument("--claude-model", default=DEFAULT_CLAUDE_MODEL)
+    add = commands.add_parser("add-peer", help="Add a peer before workspace registration")
+    add.add_argument("config", type=Path)
+    add.add_argument("peer_id")
+    add.add_argument("--runtime", choices=SUPPORTED_RUNTIMES, required=True)
+    add.add_argument("--model", required=True)
+    add.add_argument("--allowed", nargs="+", required=True, metavar="PEER")
+    add.add_argument("--reciprocal", action="store_true", help="Allow those peers to reply")
+    add.add_argument("--api-key-env", help="Environment variable name; never the key itself")
+    add.add_argument("--api-base", help="Optional HTTP(S) API endpoint")
+    add.add_argument("--max-tool-rounds", type=int, default=DEFAULT_TOOL_ROUNDS)
+    add.add_argument("--max-output-tokens", type=int, default=DEFAULT_OUTPUT_TOKENS)
     inspect = commands.add_parser("inspect", help="Print administrative mailbox transcript")
     inspect.add_argument("config", type=Path)
     resolve = commands.add_parser("resolve", help="Record reviewed uncertain outcome; never retry")
@@ -209,6 +234,20 @@ def main() -> None:
             else:
                 path = initialize(args.directory, args.codex_model, args.claude_model)
             print(path)
+        elif args.command == "add-peer":
+            add_peer(
+                args.config,
+                args.peer_id,
+                args.runtime,
+                args.model,
+                args.allowed,
+                reciprocal=args.reciprocal,
+                api_key_env=args.api_key_env,
+                api_base=args.api_base,
+                max_tool_rounds=args.max_tool_rounds,
+                max_output_tokens=args.max_output_tokens,
+            )
+            print(f"Added {args.peer_id} ({args.runtime}); routes configured")
         elif args.command == "inspect":
             config, store = load(args.config)
             print(json.dumps(store.messages(config["conversation_id"]), indent=2))

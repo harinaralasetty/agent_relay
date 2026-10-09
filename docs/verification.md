@@ -72,9 +72,9 @@ provider behavior was exercised on macOS only.
 
 This record describes measured evidence, not a guarantee that all defects are absent.
 
-## AgentRelay rename qualification — 9 October 2026
+## Package and namespace qualification — 9 October 2026
 
-The project was renamed from PeerCourier to AgentRelay. Python distribution:
+The verified public identity is AgentRelay. Python distribution:
 `agentrelay-local`; module/CLI/MCP server name: `agentrelay`; MCP environment prefix:
 `AGENTRELAY_`. Existing mailbox and config formats were preserved.
 
@@ -154,3 +154,45 @@ No native desktop-child attachment, dynamic agent spawning, file editing or shel
 permissions were enabled by this change. Existing adapter restriction, uncertainty,
 idempotency, identity and cleanup tests remain in the full suite. Raw provider
 transcripts, identities and credentials stay excluded from the repository.
+
+## Optional LiteLLM runtime qualification — 9 October 2026
+
+Version 0.2.0 retains both CLI adapters and adds a separate optional API runtime.
+The `models` extra pins LiteLLM 1.104.2; the standard install requires no LiteLLM.
+CLI versions, live models and macOS/Python environment remain those listed above.
+
+| Check | Observed result |
+|---|---|
+| Full suite with optional SDK | 126 passed |
+| Standard installation without LiteLLM | 122 passed; 4 SDK-dependent cases skipped |
+| Actual SDK against owned local HTTP endpoint | Valid completion; HTTP429 made exactly one request; selected dummy key isolated from ambient credentials |
+| Two API peers through real SDK, MCP and supervisor | Both initiators passed five exact linked, ACKed messages with one stable session per peer |
+| Live CLI↔CLI smoke checks | Claude-initiated passed; Codex-initiated fresh follow-up passed; five expected messages each |
+| Codex→local API and local API→Codex | 2/2 smoke runs passed; three linked, ACKed messages per run; no runtime errors |
+| Claude→local API and local API→Claude | 2/2 smoke runs passed; three linked, ACKed messages per run; no runtime errors |
+| Independent implementation review and re-review | Two confirmed defects fixed with failing-then-passing regression tests; no remaining concrete defect in reviewed scope |
+| Lint, formatting, source/wheel builds and clean installs | Passed; base install excludes LiteLLM; optional wheel install includes pinned SDK |
+
+Three CLI↔CLI runs were attempted in this update: **one Codex initiation failure,
+then two passes** (one for each initiator). The failed Codex turn read an empty
+inbox and returned without the requested initial send. It produced no messages or
+runtime error; the demo correctly exited 1. Its receipt is retained privately.
+A fresh workspace succeeded; no uncertain turn was retried. These results show
+that a successful provider turn does not ensure task completion, and do not imply
+an arbitrary-task success rate.
+
+The four mixed-runtime tests used authenticated live Codex/Claude sessions and
+the actual LiteLLM SDK calling an owned local OpenAI-style endpoint. Endpoint
+responses were scripted protocol fixtures, **not a third-provider model**. Each
+run retained stable sessions and finished with all recipient ACKs and no unresolved
+delivery. They qualify wiring in both directions, not third-provider reasoning,
+production billing, or universal model compatibility. External API-model testing
+was deferred by user choice; no external API key was supplied or extracted.
+
+Review fixes reject incomplete clean histories with missing/mismatched tool results
+and validate limits before creating/registering a mailbox. Tests also cover dirty,
+native, stale and model-mismatched resumes, malformed/unsolicited calls, denied
+mailbox operations, cancellation after a send, bounds, and redacted diagnostics.
+Retries, fallbacks, cache and callback logging are disabled; SDK import uses its
+bundled cost map. API cost reporting remains unknown. Private state, credentials
+and test receipts are excluded from both published packages and Git.

@@ -8,11 +8,12 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.12', '3.13']
+        extra: ['', '--extra models']
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - run: uv sync --locked --python '${{ matrix.python-version }}'
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
-      - run: uv run pytest -q
+      - run: uv sync --locked --python '${{ matrix.python-version }}' ${{ matrix.extra }}
+      - run: uv run ${{ matrix.extra }} ruff check .
+      - run: uv run ${{ matrix.extra }} ruff format --check .
+      - run: uv run ${{ matrix.extra }} pytest -q
       - run: uv build

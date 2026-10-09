@@ -5,17 +5,17 @@
 AgentRelay is an open-source Python **communication relay between agents**, using
 a local, durable mailbox exposed by the **Model Context Protocol (MCP)**. Any
 configured peer can initiate a conversation with its permitted peers; **no manager
-is required**. The included runtime adapters currently support **Codex CLI and
-Claude Code**. An optional delivery supervisor starts idle managed peers, supplies
-incoming messages, and resumes their recorded provider sessions.
+is required**. The included runtime adapters support **Codex CLI, Claude Code,
+and API models through optional LiteLLM**. A delivery supervisor starts idle managed
+peers, supplies incoming messages, and resumes their recorded sessions.
 
 Use it when you want two coding agents to discuss a proposal, clarify a requirement,
 or check a small answer without copying messages between their terminals. AgentRelay
 routes explicit messages; it does not forward every piece of assistant prose.
 
 Built and maintained by [Hari Naralasetty](https://github.com/harinaralasetty).
-This repository is the **local Python/MCP implementation** formerly called PeerCourier;
-it is independent of other products named Agent Relay. The Python distribution is
+This repository is the **local Python/MCP implementation**, independent of other
+products named Agent Relay. The Python distribution is
 `agentrelay-local`, the command is `agentrelay`, and installation is from this source
 repository. **`pip install agentrelay` installs a different project.**
 
@@ -34,11 +34,12 @@ repository. **`pip install agentrelay` installs a different project.**
 | Two-way agent conversations | Either peer can initiate, ask for clarification, or send a linked reply |
 | Optional manager workflow | Any peer can take a manager role; the included example uses Claude/Codex teams |
 | Durable local mailbox | SQLite persists addressed messages, delivery state, and explicit acknowledgments |
-| Session continuity | Healthy Codex and Claude Code sessions resume on subsequent turns and runs |
+| Session continuity | Healthy CLI sessions and private API histories resume on later turns and runs |
 | Controlled routing | Each peer has its own identity/token, permitted recipients, and conversation membership |
 | Duplicate protection | Reusing an idempotency key with the same message returns the original; conflicting reuse fails |
 | Delivery supervision | Idle managed peers receive input; each peer's turns are serialized |
 | Provider-neutral interface | Other runtimes can use the five MCP tools or implement a runtime adapter |
+| Optional API models | LiteLLM supplies inference; AgentRelay provides the bounded MCP tool loop and history |
 
 The included adapters run **managed sessions**, separate from existing desktop chats
 and native subagent trees. They limit the peers to mailbox communication for this
@@ -147,7 +148,7 @@ Replace the prompt with a small discussion task. The agents choose when to send
 messages; a completed provider turn alone does not establish that the conversation
 answered your question correctly.
 
-`run` manages both configured adapters, starts each peer when it has input, delivers
+`run` manages the configured adapters, starts each peer when it has input, delivers
 queued messages, and stops when the owned queues drain. Healthy sessions resume on later runs. To process messages that
 arrive while the supervisor is idle, keep it running with:
 
@@ -157,8 +158,9 @@ uv run agentrelay run .agentrelay/my-task/config.json --watch
 
 Watch mode stops on cancellation or the configured wall-time limit. Configuration
 controls `max_messages`, per-peer `max_turns`, `max_seconds`, and `max_cost_usd`.
-The cost setting uses Claude's budget/reporting; **it does not impose a Codex dollar
-cap**. See the [delivery and budget contract](docs/architecture.md#limits-and-trust).
+The cost setting uses Claude's budget/reporting; **it does not impose a Codex or
+LiteLLM dollar cap**. API calls use token, round, and time limits instead.
+See the [delivery and budget contract](docs/architecture.md#limits-and-trust).
 
 ## Use Claude or Codex as the manager
 
@@ -259,7 +261,7 @@ Each registered peer receives the same tools through its own stdio MCP server:
 | `peer_ack` | Explicitly acknowledge a received message |
 | `peer_status` | Check delivery state separately from acknowledgment |
 
-The managed Codex and Claude Code adapters configure MCP automatically. For another
+All three managed adapters configure MCP automatically. For another
 MCP-capable client, first register its identity, allowed routes, and conversation in
 the shared store. Then configure its per-peer server using this Claude-style shape:
 
@@ -295,21 +297,61 @@ therefore does not automatically run every model or wake an idle agent.
 |---|---|
 | Another model supported by Codex CLI or Claude Code | Choose its model ID using `--codex-model` / `--claude-model` during initialization, or edit a peer's `model` before its first run |
 | Another MCP-capable agent application | Register its peer identity/routes/conversation and connect it to its per-peer stdio MCP server; this is currently an advanced integration, without a one-command attach workflow |
-| A raw API or local model | Supply an agent host/tool loop plus a compatible runtime adapter for automatic delivery; this repository currently has no LiteLLM or generic API adapter |
+| A tool-calling API or local model | Install the optional `models` extra and add a `litellm` peer as below |
 
-The transport is provider-neutral. The included automatic delivery adapters are
-`codex` and `claude`; changing `runtime` to another name in the config is currently
-rejected. Changing a model name does not switch providers or add tools that a
-runtime does not support.
+### Add an API model with LiteLLM
 
-[LiteLLM](https://docs.litellm.ai/docs/) can simplify model-provider API calls, while
-[MCP](https://modelcontextprotocol.io/docs/learn/architecture) supplies the standard
-tool connection. They solve different parts of the integration. An optional API
-runtime could combine them without replacing the relay or requiring an LLM manager.
-That adapter is a proposed extension, **not an implemented or tested capability**.
-API-backed models would use provider keys/billing and adapter-owned history rather
-than automatically inheriting authenticated CLI subscriptions or native CLI sessions.
-Tool-calling compatibility must be checked for each selected model/endpoint.
+[LiteLLM](https://docs.litellm.ai/docs/) translates provider API calls;
+[MCP](https://modelcontextprotocol.io/docs/learn/architecture) connects the mailbox
+tools. AgentRelay supplies the agent loop around both. The optional dependency is
+pinned and kept out of the standard CLI installation.
+The pinned LiteLLM extra currently supports Python 3.12–3.14.
+
+```sh
+uv sync --locked --extra models
+uv run --extra models agentrelay init .agentrelay/mixed \
+  --codex-model gpt-6-luna --claude-model haiku
+
+# Set MODEL_API_KEY in your shell using your provider's secure credential setup.
+# Replace PROVIDER/MODEL_ID with a LiteLLM-supported, tool-calling model ID.
+uv run --extra models agentrelay add-peer .agentrelay/mixed/config.json maple \
+  --runtime litellm --model PROVIDER/MODEL_ID \
+  --api-key-env MODEL_API_KEY --allowed cedar birch --reciprocal
+
+uv run --extra models agentrelay run .agentrelay/mixed/config.json --peer cedar \
+  --prompt "In conversation demo, ask maple for one benefit of explicit acknowledgments. ACK its linked reply, then send it a final=true thank-you."
+uv run --extra models agentrelay inspect .agentrelay/mixed/config.json
+```
+
+This adds `maple` while keeping Codex `cedar` and Claude Code `birch`. `--allowed`
+sets whom the new peer may message; `--reciprocal` lets those peers reply. Every peer
+can initiate using `run --peer PEER_ID --prompt ...`; a manager is optional.
+`add-peer` also accepts `--runtime codex` or `claude` for more CLI peers.
+
+Add peers **before the first `run`, `inspect`, or `resolve`**. Those commands register
+the mailbox, after which routes and conversation membership are immutable. Create
+a fresh state directory to change the topology. The command refuses duplicate
+peers and writes private configuration atomically.
+
+Use `--api-base https://your-endpoint/v1` for a compatible gateway or local
+OpenAI-style endpoint; provider prefixes and base paths follow
+[LiteLLM's provider documentation](https://docs.litellm.ai/docs/providers).
+An endpoint without authentication can omit `--api-key-env`; the adapter sends a
+nonsecret placeholder instead of reading ambient provider keys. Named but missing
+credentials fail closed. Keys are read from the environment, never stored in config.
+Only select tool-calling models: API access alone does not establish compatibility.
+
+The loop exposes only the five mailbox tools, defaults to 8 tool rounds and 512
+output tokens per request, and has a 90-second turn timeout. Configure
+`--max-tool-rounds`, `--max-output-tokens`, or the peer's `timeout` before running.
+No retry, fallback, routing service, file tool, or shell tool is enabled. API
+histories are private files bound to peer, model, and endpoint; incomplete or
+mismatched histories are refused. API calls use your provider's keys and billing,
+independently of CLI subscriptions and native CLI sessions.
+
+The [verification record](docs/verification.md) separates real CLI smoke tests from
+local SDK/protocol tests. No compatibility claim is made for every LiteLLM provider
+or model; test your chosen endpoint with a small conversation first.
 
 ## Limitations and permissions
 
@@ -334,9 +376,9 @@ small live conversations in both directions, and session-resume checks, includin
 installed CLI versions and coverage limits. Automated tests do not call models.
 
 ```sh
-uv run pytest -q
-uv run ruff check .
-uv run ruff format --check .
+uv run --extra models pytest -q
+uv run --extra models ruff check .
+uv run --extra models ruff format --check .
 uv build
 ```
 
@@ -344,15 +386,3 @@ Read the [development workflow](CONTRIBUTING.md) before changing adapters or rou
 Report reproducible problems through [GitHub issues](https://github.com/harinaralasetty/agentrelay/issues),
 with versions and redacted errors; exclude tokens and private transcripts.
 [MIT licensed](LICENSE).
-
-## Migrating from PeerCourier
-
-The project is now AgentRelay. Use the new clone URL, `agentrelay` command,
-`agentrelay` Python module/MCP server name, and `AGENTRELAY_*` MCP environment
-variables. The distribution name is `agentrelay-local`.
-
-Existing `config.json` and SQLite mailbox formats are unchanged. You can retain an
-old `.peercourier/` state directory and pass its config path to the new command;
-both old and new default state directories are ignored. Stop the old supervisor
-before switching, update any custom MCP configuration, and run `uv sync --locked`
-in the updated checkout. Do not initialize over an existing config.

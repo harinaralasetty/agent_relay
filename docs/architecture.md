@@ -1,8 +1,9 @@
 # Architecture and delivery contract
 
 AgentRelay is a local, provider-neutral mailbox with optional runtime supervision.
-Every peer gets the same MCP tool contract. The initial runtime adapters support
-Codex app-server roots and Claude Code CLI sessions; additional runtimes can use
+Every peer gets the same MCP tool contract. Runtime adapters support
+Codex app-server roots, Claude Code CLI sessions, and optional LiteLLM API models.
+Additional runtimes can use
 the MCP mailbox directly or implement the Python runtime interface.
 
 ```mermaid
@@ -102,6 +103,28 @@ must relay messages using its native collaboration interface. AgentRelay does
 not implement that parent relay or attach to arbitrary already-running desktop
 chats. MCP notifications alone do not provide idle wake.
 
+### Optional API runtime
+
+The `models` extra adds LiteLLM for inference without changing the mailbox or CLI
+adapters. Each API turn opens and closes its own official MCP client/server context;
+no cross-task MCP lifecycle is kept open. It lists exactly the five mailbox tools,
+converts their schemas for inference, validates tool calls, and returns tool results
+to the model until a completed assistant response. Provider and SDK retry counts
+are zero. Unknown tools, malformed calls, truncation, duplicate call IDs, and round,
+time, response or history limits fail closed. Mailbox permission checks still apply.
+
+Each session has a `litellm:` UUID and private atomic JSON history in its peer
+workspace. History is bound to backend, peer, model and API base URL. A durable
+dirty marker is saved before inference/tool effects; interrupted or incomplete
+histories cannot be resumed or silently replayed. A file lock and snapshot check
+reject concurrent or stale resumes. Provider keys are resolved from a named
+environment variable and excluded from histories and diagnostics.
+
+`add-peer` edits only an unregistered workspace. It and mailbox registration share
+a config lock; an existing database refuses topology edits. Routes and conversation
+membership retain their immutable store contract. Configure all peers before first
+use, then initialize a fresh workspace for a different topology.
+
 ## Limits and trust
 
 - macOS/Linux, Python 3.12+, trusted local OS user. Windows is not supported yet.
@@ -110,14 +133,16 @@ chats. MCP notifications alone do not provide idle wake.
   hostile multi-tenant service. Do not expose the database over a network.
 - Maximum message length 16,000 characters; central conversation message cap,
   per-peer turn cap, per-turn timeout and supervisor wall-time limit.
-- Claude applies its CLI budget and reported cumulative cost cap. Codex provides
-  no enforced dollar cap here; its turn/time/message limits only bound activity.
+- Claude applies its CLI budget and reported cumulative cost cap. Codex and LiteLLM
+  provide no enforced dollar cap here; turn/time/message limits bound activity,
+  and LiteLLM adds round and output-token limits. LiteLLM cost reporting is unknown.
   Interrupting a process does not prove a provider request stopped billing.
 - Mailbox acknowledgments do not prove semantic correctness. Application-specific
   verification belongs above the transport.
 - API/account limits, organizational policy and changing CLI interfaces still
   apply. Use provider-supported credentials. No credentials are supplied or
-  extracted by AgentRelay; it uses locally installed authenticated CLIs.
+  extracted by AgentRelay; CLIs use local logins, API peers use explicit environment
+  key references or a local endpoint. API access does not inherit CLI subscriptions.
 
 ## Primary references
 
@@ -126,3 +151,4 @@ chats. MCP notifications alone do not provide idle wake.
 - [Claude Code headless usage](https://code.claude.com/docs/en/headless)
 - [Claude Code CLI reference](https://code.claude.com/docs/en/cli-reference)
 - [MCP tool specification](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)
+- [LiteLLM providers](https://docs.litellm.ai/docs/providers)

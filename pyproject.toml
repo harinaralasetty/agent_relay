@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agentrelay-local"
-version = "0.1.0"
-description = "Local agent-to-agent messaging over MCP, with Codex CLI and Claude Code adapters"
+version = "0.2.0"
+description = "Local agent messaging over MCP for Codex CLI, Claude Code, and LiteLLM models"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
@@ -22,6 +22,9 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
+
+[project.optional-dependencies]
+models = ["litellm==1.104.2"]
 
 [project.urls]
 Repository = "https://github.com/harinaralasetty/agentrelay"
