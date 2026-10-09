@@ -43,15 +43,27 @@ and native subagent trees. They limit the peers to mailbox communication for thi
 initial release; this is a conversation bridge, not a general coding-task runner.
 
 ```mermaid
-flowchart LR
-    C[Codex CLI peer] <-->|MCP tools| MC[Codex peer mailbox server]
-    A[Claude Code peer] <-->|MCP tools| MA[Claude peer mailbox server]
-    MC <--> DB[(Local SQLite mailbox)]
-    MA <--> DB
-    DB --> S[Delivery supervisor]
-    S -->|input turns| C
-    S -->|input turns| A
+flowchart TB
+    subgraph ClaudeLed["Claude manages Codex workers"]
+        CM["Claude Code manager"] -->|assign task via MCP| CA["Codex worker A"]
+        CM -->|assign task via MCP| CB["Codex worker B"]
+        CA -->|linked result| CM
+        CB -->|linked result| CM
+    end
+    subgraph CodexLed["Codex manages Claude workers"]
+        GM["Codex CLI manager"] -->|assign task via MCP| GA["Claude worker A"]
+        GM -->|assign task via MCP| GB["Claude worker B"]
+        GA -->|linked result| GM
+        GB -->|linked result| GM
+    end
 ```
+
+These are alternative team configurations. In either direction, AgentRelay routes
+assignments and replies through per-peer MCP servers and the shared SQLite mailbox.
+The supervisor wakes workers and returns results to the manager; the manager waits
+for both results before final verification. The [architecture diagram](docs/architecture.md)
+shows the delivery components. These are managed sessions, separate from native
+subagent trees.
 
 ## Quick start: connect Codex CLI and Claude Code
 

@@ -7,14 +7,21 @@ the MCP mailbox directly or implement the Python runtime interface.
 
 ```mermaid
 flowchart LR
-    A[Agent runtime A] <-->|five MCP tools| MA[Per-peer stdio MCP]
-    B[Agent runtime B] <-->|five MCP tools| MB[Per-peer stdio MCP]
-    MA <--> DB[(Shared SQLite mailboxes)]
+    M["Manager: Claude or Codex"] <-->|five MCP tools| MM["Manager MCP server"]
+    A["Worker A: other runtime"] <-->|five MCP tools| MA["Worker A MCP server"]
+    B["Worker B: other runtime"] <-->|five MCP tools| MB["Worker B MCP server"]
+    MM <--> DB[(Shared SQLite mailboxes)]
+    MA <--> DB
     MB <--> DB
-    DB --> S[Single delivery supervisor]
+    DB --> S["Single delivery supervisor"]
+    S -->|serialized input turns| M
     S -->|serialized input turns| A
     S -->|serialized input turns| B
 ```
+
+The manager can be Claude with two Codex workers, or Codex with two Claude workers.
+Each participant has its own MCP identity and resumable session. The same transport
+also supports the original two-peer conversations.
 
 Per-peer MCP processes share a file-backed SQLite database. Transactions serialize
 message insertion, conversation limits and delivery claims. A supervisor uses a
