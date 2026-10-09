@@ -4,7 +4,8 @@
 
 AgentRelay is an open-source Python tool that connects **Codex CLI and Claude Code**
 through a local, durable mailbox exposed by the **Model Context Protocol (MCP)**.
-Either agent can start a conversation. A delivery supervisor starts an idle managed
+Either agent can start a conversation or act as a manager that assigns small
+tasks to workers from the other runtime. A delivery supervisor starts an idle managed
 peer, supplies its incoming messages, and resumes its recorded provider session.
 
 Use it when you want two coding agents to discuss a proposal, clarify a requirement,
@@ -19,6 +20,7 @@ repository. **`pip install agentrelay` installs a different project.**
 
 [Quick start](#quick-start-connect-codex-cli-and-claude-code) ·
 [Your own conversation](#start-your-own-conversation) ·
+[Claude or Codex as manager](#use-claude-or-codex-as-the-manager) ·
 [MCP tools](#mcp-tools-and-other-runtimes) ·
 [Limitations](#limitations-and-permissions) ·
 [Verified results](docs/verification.md)
@@ -28,6 +30,7 @@ repository. **`pip install agentrelay` installs a different project.**
 | Capability | Behavior |
 |---|---|
 | Two-way agent conversations | Either peer can initiate, ask for clarification, or send a linked reply |
+| Manager and workers | Claude can assign tasks to Codex workers; Codex can assign tasks to Claude workers |
 | Durable local mailbox | SQLite persists addressed messages, delivery state, and explicit acknowledgments |
 | Session continuity | Healthy Codex and Claude Code sessions resume on subsequent turns and runs |
 | Controlled routing | Each peer has its own identity/token, permitted recipients, and conversation membership |
@@ -152,6 +155,72 @@ Watch mode stops on cancellation or the configured wall-time limit. Configuratio
 controls `max_messages`, per-peer `max_turns`, `max_seconds`, and `max_cost_usd`.
 The cost setting uses Claude's budget/reporting; **it does not impose a Codex dollar
 cap**. See the [delivery and budget contract](docs/architecture.md#limits-and-trust).
+
+## Use Claude or Codex as the manager
+
+A manager is a **configured peer with a task prompt**, not a special provider or a
+native subagent parent. AgentRelay launches its workers when assignments arrive,
+keeps their sessions separate, and delivers results back to the manager. Workers
+can run concurrently; input to each individual peer stays serialized.
+
+Run the bounded example in both directions, using a new directory each time:
+
+```sh
+# Claude Haiku manager → two Codex GPT-6 Luna workers
+uv run agentrelay delegation-demo .agentrelay/claude-manager --manager claude \
+  --codex-model gpt-6-luna --claude-model haiku
+
+# Codex GPT-6 Luna manager → two Claude Haiku workers
+uv run agentrelay delegation-demo .agentrelay/codex-manager --manager codex \
+  --codex-model gpt-6-luna --claude-model haiku
+```
+
+Each run consumes provider quota and uses low reasoning effort. The manager assigns
+addition to `worker-a` and multiplication to `worker-b`. Both workers send linked
+results; the manager receives both, checks them, and sends a final verification to
+`worker-a`. `worker-b` finishes after returning its result. The CLI prints
+`"verified": true` and exits 0 only for the five expected messages, correct results
+and reply links, results before closure, eventual recipient ACKs, and no runtime
+errors. It does not prove the model's reasoning or ACK timing relative to closure.
+
+```mermaid
+flowchart TD
+    M[Manager: Claude or Codex] -->|assignment via MCP mailbox| A[Worker A: other runtime]
+    M -->|assignment via MCP mailbox| B[Worker B: other runtime]
+    A -->|linked result| M
+    B -->|linked result| M
+    M --> V[Receive both results and review]
+    V --> F[Send final verification; recipient ACKs]
+```
+
+For your own small text tasks, initialize a team without calling any models:
+
+```sh
+uv run agentrelay init .agentrelay/my-team --manager claude \
+  --codex-model gpt-6-luna --claude-model haiku
+```
+
+Use `--manager codex` to reverse the providers. The config contains `manager`,
+`worker-a`, and `worker-b`, with conversation ID `delegation` and a 12-message
+limit. The manager may address both workers; each worker may address only the
+manager. Edit the conversation ID and limits **before the first run** if needed.
+Start the manager with your instructions:
+
+```sh
+uv run agentrelay run .agentrelay/my-team/config.json --peer manager \
+  --prompt "Use conversation_id='delegation' in every send. Assign worker-a to suggest one name for a boolean validation function, and worker-b to explain one benefit of the name is_valid. Send both assignments now. Tell workers to ACK, send a linked reply with final=false, then return. Receive and ACK both results, review them, then send worker-a one final=true summary linked to its result."
+uv run agentrelay inspect .agentrelay/my-team/config.json
+```
+
+For custom tasks, `run` reports delivery/runtime errors; it does **not** judge the
+answers. Review the saved transcript yourself. Use distinct idempotency keys for
+assignments and follow-ups. A `final=true` message closes the **whole conversation**,
+so collect all outstanding results before closing. Role behavior is guided by
+prompts; the mailbox does not reserve final closure exclusively for managers.
+
+The included adapters support these message-based tasks. File editing, shell
+execution, dynamic native-agent spawning, and attaching to an existing desktop
+agent tree need additional runtime/permission support and are not enabled here.
 
 ## Delivery failures and recovery
 

@@ -64,7 +64,7 @@ locks, uncertainty, stale/mismatched session responses, denied approvals, timeou
 malformed/oversized output and owned descendant cleanup. External protocol fault
 cases use fake runtimes; they do not establish a live provider crash or outage test.
 
-Live tests cover two managed peers, both initiators, linked replies, final closure,
+Initial live tests cover two managed peers, both initiators, linked replies, final closure,
 explicit ACKs and healthy session resume. They do not prove native desktop/subagent
 attachment, hostile multi-user isolation, large-team load, Windows support, or a
 universal provider dollar cap. Linux CI runs the credential-free checks; live
@@ -109,3 +109,48 @@ The moved virtual environment had stale executable paths and was rebuilt. A
 fake-CLI startup test initially hit its two-second allowance during cold startup;
 its startup margin is now ten seconds, while the intentional turn timeout remains
 0.1 seconds. Production timeout defaults were unchanged.
+
+## Manager delegation qualification — 9 October 2026
+
+The manager workflow uses three managed peers with star routing. `init --manager`
+creates a custom-task config without starting providers; `delegation-demo` exercises
+one manager and two workers with fixed, small task payloads. This tests assignment,
+result routing and closure, rather than general coding or mathematical capability.
+CLI versions and live models remain those listed above.
+
+| Fresh check | Observed result |
+|---|---|
+| Automated behavioral suite | 74 passed, including 26 manager-workflow cases |
+| Claude Haiku manager → two Codex GPT-6 Luna workers | 5/5 expected messages completed and ACKed; exit 0 |
+| Codex GPT-6 Luna manager → two Claude Haiku workers | 5/5 expected messages completed and ACKed; exit 0 |
+| Turns in each successful live run | Manager 3; worker-a 2; worker-b 1 |
+| Session continuity within each run | One stable provider session for each of the three peers |
+| Result ordering | Worker-b replied first under Claude manager; worker-a first under Codex manager |
+| Independent code, documentation and live-receipt review | No remaining actionable finding in the reviewed scope |
+
+Four live manager runs were attempted: **two initial failures and two fresh passes**.
+Both initial managers discovered the workers but did not use the supplied
+conversation ID: Claude guessed another ID; Codex refused to infer one. Neither
+persisted an assignment. The qualification correctly returned false and the CLI
+exited 1. The manager prompt now spells out `conversation_id='delegation'` for
+every send, including closure. Fresh state directories were used for both subsequent
+runs; failed receipts were retained privately and are not counted as successful.
+There was no ambiguous delivery to retry.
+
+Both successful transcripts contain two assignments, two correctly linked results,
+and one final verification after both results were stored. All recipients eventually
+ACKed their messages, all delivery states were completed, and no runtime errors or
+unresolved deliveries were reported. These are small smoke tests, not a measured
+success-rate estimate for arbitrary assignments or long-running teams.
+
+Independent review found that eventual ACK state does not establish that an ACK
+happened before closure. The verifier and documentation therefore explicitly state
+the observable contract; ACK timing and internal model reasoning are not claimed.
+Manager/worker roles are prompt instructions, and final closure is still available
+to every participant. The example rejects premature closure; custom-task `run`
+reports delivery failures but does not grade task answers.
+
+No native desktop-child attachment, dynamic agent spawning, file editing or shell
+permissions were enabled by this change. Existing adapter restriction, uncertainty,
+idempotency, identity and cleanup tests remain in the full suite. Raw provider
+transcripts, identities and credentials stay excluded from the repository.

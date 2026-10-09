@@ -11,12 +11,14 @@ from pathlib import Path
 
 from agentrelay.adapters.claude import ClaudeRuntime
 from agentrelay.adapters.codex import CodexRuntime
+from agentrelay.delegation import initialize_delegation, manager_prompt, verify_delegation
 from agentrelay.runtime import RuntimeConfig
 from agentrelay.store import Store, identifier
 from agentrelay.supervisor import Supervisor
 
 DEFAULT_CODEX_MODEL = "gpt-6-luna"
 DEFAULT_CLAUDE_MODEL = "haiku"
+DEFAULT_TEAM_MAX_MESSAGES = 12
 RUNTIMES = {"codex": CodexRuntime, "claude": ClaudeRuntime}
 DEMO_TEXTS = [
     "Please ask me 'Which two numbers should I add?' Then add the two numbers I provide "
@@ -158,6 +160,11 @@ def main() -> None:
     commands = parser.add_subparsers(dest="command", required=True)
     init = commands.add_parser("init", help="Create private local config (never overwrites)")
     init.add_argument("directory", type=Path)
+    init.add_argument(
+        "--manager",
+        choices=["claude", "codex"],
+        help="Create a manager with two opposite-provider workers",
+    )
     init.add_argument("--codex-model", default=DEFAULT_CODEX_MODEL)
     init.add_argument("--claude-model", default=DEFAULT_CLAUDE_MODEL)
     inspect = commands.add_parser("inspect", help="Print administrative mailbox transcript")
@@ -176,6 +183,13 @@ def main() -> None:
     demo.add_argument("--initiator", choices=["cedar", "birch"], default="cedar")
     demo.add_argument("--codex-model", default=DEFAULT_CODEX_MODEL)
     demo.add_argument("--claude-model", default=DEFAULT_CLAUDE_MODEL)
+    delegation = commands.add_parser(
+        "delegation-demo", help="One manager assigns two small worker tasks (uses model quota)"
+    )
+    delegation.add_argument("directory", type=Path)
+    delegation.add_argument("--manager", choices=["claude", "codex"], default="claude")
+    delegation.add_argument("--codex-model", default=DEFAULT_CODEX_MODEL)
+    delegation.add_argument("--claude-model", default=DEFAULT_CLAUDE_MODEL)
     commands.add_parser("mcp", help="Run per-peer stdio MCP using AGENTRELAY_* environment")
     args = parser.parse_args()
     try:
@@ -184,7 +198,17 @@ def main() -> None:
 
             mcp_main()
         elif args.command == "init":
-            print(initialize(args.directory, args.codex_model, args.claude_model))
+            if args.manager:
+                path = initialize_delegation(
+                    args.directory,
+                    args.manager,
+                    args.codex_model,
+                    args.claude_model,
+                    max_messages=DEFAULT_TEAM_MAX_MESSAGES,
+                )
+            else:
+                path = initialize(args.directory, args.codex_model, args.claude_model)
+            print(path)
         elif args.command == "inspect":
             config, store = load(args.config)
             print(json.dumps(store.messages(config["conversation_id"]), indent=2))
@@ -192,6 +216,18 @@ def main() -> None:
             _, store = load(args.config)
             store.resolve(args.message_id, args.outcome)
             print(json.dumps({"message_id": args.message_id, "resolved": args.outcome}))
+        elif args.command == "delegation-demo":
+            path = initialize_delegation(
+                args.directory, args.manager, args.codex_model, args.claude_model
+            )
+            config, store = load(path)
+            report = asyncio.run(run(path, {"manager": manager_prompt()}))
+            report["messages"] = store.messages(config["conversation_id"])
+            report["manager_runtime"] = args.manager
+            report["verified"] = not report["errors"] and verify_delegation(report["messages"])
+            print(json.dumps(report, indent=2))
+            if not report["verified"]:
+                raise SystemExit(1)
         elif args.command == "demo":
             path = initialize(args.directory, args.codex_model, args.claude_model)
             config, store = load(path)
