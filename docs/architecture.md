@@ -17,7 +17,7 @@ flowchart LR
     S -->|serialized input turns| B
 ```
 
-No LLM manager is required. Agents communicate as peers; their allowed routes are
+Agents communicate as peers; their allowed routes are
 configured by the administrator. Each participant has its own MCP identity. The
 diagram shows two participants for clarity; the store also supports more peers.
 For the included managed runtimes, the supervisor provides automatic delivery and
@@ -61,23 +61,6 @@ they are never automatically replayed. Recorded healthy provider sessions are
 resumed. A stale or mismatched provider session fails closed, without silently
 creating another agent. The administrator must investigate uncertain outcomes and
 decide whether to issue a distinct new task.
-
-## Optional manager and worker topology
-
-Manager/worker roles are optional workflow instructions. A manager uses the same
-five MCP tools as every other peer. `init --manager`
-creates a star: manager can send to two workers; each worker can send only to
-manager. Provider selection changes the runtime definitions, not the mailbox
-contract. Workers are configured in advance and start lazily on delivery.
-No runtime may create additional native children through this workflow.
-
-The `delegation-demo` command sends two assignments, accepts the two linked results
-in either arrival order, and requires final verification after both results exist.
-It checks exact task results, eventual recipient ACKs and successful delivery
-states. ACK timing and the manager's internal reasoning are outside its transcript
-check. Manager/worker roles are instructions, not added authority: any participant
-can send final=true and globally close the conversation. Premature closure fails
-the example qualification; custom workflows must account for this shared contract.
 
 ## Runtime boundaries
 

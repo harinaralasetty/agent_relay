@@ -4,8 +4,8 @@
 
 agent_relay is an open-source Python **communication relay between agents**, using
 a local, durable mailbox exposed by the **Model Context Protocol (MCP)**. Any
-configured peer can initiate a conversation with its permitted peers; **no manager
-is required**. The included runtime adapters support **Codex CLI, Claude Code,
+configured peer can initiate a conversation with its permitted peers. The included
+runtime adapters support **Codex CLI, Claude Code,
 and API models through optional LiteLLM**. A delivery supervisor starts idle managed
 peers, supplies incoming messages, and resumes their recorded sessions.
 
@@ -21,7 +21,6 @@ repository. **Install from this repository; no PyPI release is published for thi
 
 [Quick start](#quick-start-connect-codex-cli-and-claude-code) ·
 [Your own conversation](#start-your-own-conversation) ·
-[Claude or Codex as manager](#use-claude-or-codex-as-the-manager) ·
 [MCP tools](#mcp-tools-and-other-runtimes) ·
 [More models and agents](#use-other-models-and-agent-applications) ·
 [Limitations](#limitations-and-permissions) ·
@@ -32,7 +31,6 @@ repository. **Install from this repository; no PyPI release is published for thi
 | Capability | Behavior |
 |---|---|
 | Two-way agent conversations | Either peer can initiate, ask for clarification, or send a linked reply |
-| Optional manager workflow | Any peer can take a manager role; the included example uses Claude/Codex teams |
 | Durable local mailbox | SQLite persists addressed messages, delivery state, and explicit acknowledgments |
 | Session continuity | Healthy CLI sessions and private API histories resume on later turns and runs |
 | Controlled routing | Each peer has its own identity/token, permitted recipients, and conversation membership |
@@ -51,12 +49,10 @@ flowchart LR
     R <-->|send and receive via MCP| B["Agent B"]
 ```
 
-The relay does not choose a leader or require a model/provider pairing. It routes
-explicit messages between registered peers according to their configured
-permissions. More peers can join the same mailbox; manager/worker teams are an
-[optional usage pattern](#use-claude-or-codex-as-the-manager). The delivery supervisor
-is runtime infrastructure, not an AI manager. The [architecture diagram](docs/architecture.md)
-shows the MCP servers, shared mailbox, and optional runtime delivery components.
+The relay routes explicit messages between registered peers according to their
+configured permissions. Multiple peers can share the same mailbox. The
+[architecture diagram](docs/architecture.md) shows the MCP servers, shared mailbox,
+and optional runtime delivery components.
 
 ## Quick start: connect Codex CLI and Claude Code
 
@@ -162,75 +158,6 @@ The cost setting uses Claude's budget/reporting; **it does not impose a Codex or
 LiteLLM dollar cap**. API calls use token, round, and time limits instead.
 See the [delivery and budget contract](docs/architecture.md#limits-and-trust).
 
-## Use Claude or Codex as the manager
-
-This is an optional delegation example. Ordinary peer-to-peer conversations do
-not need a manager.
-
-A manager is a **configured peer with a task prompt**, not a special provider or a
-native subagent parent. agent_relay launches its workers when assignments arrive,
-keeps their sessions separate, and delivers results back to the manager. Workers
-can run concurrently; input to each individual peer stays serialized.
-
-Run the bounded example in both directions, using a new directory each time:
-
-```sh
-# Claude Haiku manager → two Codex GPT-6 Luna workers
-uv run agent_relay delegation-demo .agent_relay/claude-manager --manager claude \
-  --codex-model gpt-6-luna --claude-model haiku
-
-# Codex GPT-6 Luna manager → two Claude Haiku workers
-uv run agent_relay delegation-demo .agent_relay/codex-manager --manager codex \
-  --codex-model gpt-6-luna --claude-model haiku
-```
-
-Each run consumes provider quota and uses low reasoning effort. The manager assigns
-addition to `worker-a` and multiplication to `worker-b`. Both workers send linked
-results; the manager receives both, checks them, and sends a final verification to
-`worker-a`. `worker-b` finishes after returning its result. The CLI prints
-`"verified": true` and exits 0 only for the five expected messages, correct results
-and reply links, results before closure, eventual recipient ACKs, and no runtime
-errors. It does not prove the model's reasoning or ACK timing relative to closure.
-
-```mermaid
-flowchart TD
-    M["Agent in optional manager role"] -->|assignment via MCP mailbox| A["Peer A"]
-    M -->|assignment via MCP mailbox| B["Peer B"]
-    A -->|linked result| M
-    B -->|linked result| M
-    M --> V[Receive both results and review]
-    V --> F[Send final verification; recipient ACKs]
-```
-
-For your own small text tasks, initialize a team without calling any models:
-
-```sh
-uv run agent_relay init .agent_relay/my-team --manager claude \
-  --codex-model gpt-6-luna --claude-model haiku
-```
-
-Use `--manager codex` to reverse the providers. The config contains `manager`,
-`worker-a`, and `worker-b`, with conversation ID `delegation` and a 12-message
-limit. The manager may address both workers; each worker may address only the
-manager. Edit the conversation ID and limits **before the first run** if needed.
-Start the manager with your instructions:
-
-```sh
-uv run agent_relay run .agent_relay/my-team/config.json --peer manager \
-  --prompt "Use conversation_id='delegation' in every send. Assign worker-a to suggest one name for a boolean validation function, and worker-b to explain one benefit of the name is_valid. Send both assignments now. Tell workers to ACK, send a linked reply with final=false, then return. Receive and ACK both results, review them, then send worker-a one final=true summary linked to its result."
-uv run agent_relay inspect .agent_relay/my-team/config.json
-```
-
-For custom tasks, `run` reports delivery/runtime errors; it does **not** judge the
-answers. Review the saved transcript yourself. Use distinct idempotency keys for
-assignments and follow-ups. A `final=true` message closes the **whole conversation**,
-so collect all outstanding results before closing. Role behavior is guided by
-prompts; the mailbox does not reserve final closure exclusively for managers.
-
-The included adapters support these message-based tasks. File editing, shell
-execution, dynamic native-agent spawning, and attaching to an existing desktop
-agent tree need additional runtime/permission support and are not enabled here.
-
 ## Delivery failures and recovery
 
 Delivery and acknowledgment are separate. `completed` means the provider returned
@@ -325,7 +252,7 @@ uv run --extra models agent_relay inspect .agent_relay/mixed/config.json
 
 This adds `maple` while keeping Codex `cedar` and Claude Code `birch`. `--allowed`
 sets whom the new peer may message; `--reciprocal` lets those peers reply. Every peer
-can initiate using `run --peer PEER_ID --prompt ...`; a manager is optional.
+can initiate using `run --peer PEER_ID --prompt ...`.
 `add-peer` also accepts `--runtime codex` or `claude` for more CLI peers.
 
 Add peers **before the first `run`, `inspect`, or `resolve`**. Those commands register
