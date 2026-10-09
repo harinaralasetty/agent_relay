@@ -7,21 +7,21 @@ the MCP mailbox directly or implement the Python runtime interface.
 
 ```mermaid
 flowchart LR
-    M["Manager: Claude or Codex"] <-->|five MCP tools| MM["Manager MCP server"]
-    A["Worker A: other runtime"] <-->|five MCP tools| MA["Worker A MCP server"]
-    B["Worker B: other runtime"] <-->|five MCP tools| MB["Worker B MCP server"]
-    MM <--> DB[(Shared SQLite mailboxes)]
-    MA <--> DB
+    A["Agent A runtime"] <-->|five MCP tools| MA["Agent A MCP server"]
+    B["Agent B runtime"] <-->|five MCP tools| MB["Agent B MCP server"]
+    MA <--> DB[(Shared SQLite mailboxes)]
     MB <--> DB
-    DB --> S["Single delivery supervisor"]
-    S -->|serialized input turns| M
+    DB --> S["Optional delivery supervisor"]
     S -->|serialized input turns| A
     S -->|serialized input turns| B
 ```
 
-The manager can be Claude with two Codex workers, or Codex with two Claude workers.
-Each participant has its own MCP identity and resumable session. The same transport
-also supports the original two-peer conversations.
+No LLM manager is required. Agents communicate as peers; their allowed routes are
+configured by the administrator. Each participant has its own MCP identity. The
+diagram shows two participants for clarity; the store also supports more peers.
+For the included managed runtimes, the supervisor provides automatic delivery and
+session resume. External MCP-capable applications own their tool loop and scheduling;
+mailbox access alone does not start or wake them.
 
 Per-peer MCP processes share a file-backed SQLite database. Transactions serialize
 message insertion, conversation limits and delivery claims. A supervisor uses a
@@ -61,9 +61,10 @@ resumed. A stale or mismatched provider session fails closed, without silently
 creating another agent. The administrator must investigate uncertain outcomes and
 decide whether to issue a distinct new task.
 
-## Manager and worker topology
+## Optional manager and worker topology
 
-A manager uses the same five MCP tools as every other peer. `init --manager`
+Manager/worker roles are optional workflow instructions. A manager uses the same
+five MCP tools as every other peer. `init --manager`
 creates a star: manager can send to two workers; each worker can send only to
 manager. Provider selection changes the runtime definitions, not the mailbox
 contract. Workers are configured in advance and start lazily on delivery.

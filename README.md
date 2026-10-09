@@ -2,11 +2,12 @@
 
 **Let agents from different runtimes ask questions, reply, and keep a conversation going.**
 
-AgentRelay is an open-source Python tool that connects **Codex CLI and Claude Code**
-through a local, durable mailbox exposed by the **Model Context Protocol (MCP)**.
-Either agent can start a conversation or act as a manager that assigns small
-tasks to workers from the other runtime. A delivery supervisor starts an idle managed
-peer, supplies its incoming messages, and resumes its recorded provider session.
+AgentRelay is an open-source Python **communication relay between agents**, using
+a local, durable mailbox exposed by the **Model Context Protocol (MCP)**. Any
+configured peer can initiate a conversation with its permitted peers; **no manager
+is required**. The included runtime adapters currently support **Codex CLI and
+Claude Code**. An optional delivery supervisor starts idle managed peers, supplies
+incoming messages, and resumes their recorded provider sessions.
 
 Use it when you want two coding agents to discuss a proposal, clarify a requirement,
 or check a small answer without copying messages between their terminals. AgentRelay
@@ -22,6 +23,7 @@ repository. **`pip install agentrelay` installs a different project.**
 [Your own conversation](#start-your-own-conversation) ·
 [Claude or Codex as manager](#use-claude-or-codex-as-the-manager) ·
 [MCP tools](#mcp-tools-and-other-runtimes) ·
+[More models and agents](#use-other-models-and-agent-applications) ·
 [Limitations](#limitations-and-permissions) ·
 [Verified results](docs/verification.md)
 
@@ -30,7 +32,7 @@ repository. **`pip install agentrelay` installs a different project.**
 | Capability | Behavior |
 |---|---|
 | Two-way agent conversations | Either peer can initiate, ask for clarification, or send a linked reply |
-| Manager and workers | Claude can assign tasks to Codex workers; Codex can assign tasks to Claude workers |
+| Optional manager workflow | Any peer can take a manager role; the included example uses Claude/Codex teams |
 | Durable local mailbox | SQLite persists addressed messages, delivery state, and explicit acknowledgments |
 | Session continuity | Healthy Codex and Claude Code sessions resume on subsequent turns and runs |
 | Controlled routing | Each peer has its own identity/token, permitted recipients, and conversation membership |
@@ -43,27 +45,17 @@ and native subagent trees. They limit the peers to mailbox communication for thi
 initial release; this is a conversation bridge, not a general coding-task runner.
 
 ```mermaid
-flowchart TB
-    subgraph ClaudeLed["Claude manages Codex workers"]
-        CM["Claude Code manager"] -->|assign task via MCP| CA["Codex worker A"]
-        CM -->|assign task via MCP| CB["Codex worker B"]
-        CA -->|linked result| CM
-        CB -->|linked result| CM
-    end
-    subgraph CodexLed["Codex manages Claude workers"]
-        GM["Codex CLI manager"] -->|assign task via MCP| GA["Claude worker A"]
-        GM -->|assign task via MCP| GB["Claude worker B"]
-        GA -->|linked result| GM
-        GB -->|linked result| GM
-    end
+flowchart LR
+    A["Agent A"] <-->|send and receive via MCP| R["AgentRelay"]
+    R <-->|send and receive via MCP| B["Agent B"]
 ```
 
-These are alternative team configurations. In either direction, AgentRelay routes
-assignments and replies through per-peer MCP servers and the shared SQLite mailbox.
-The supervisor wakes workers and returns results to the manager; the manager waits
-for both results before final verification. The [architecture diagram](docs/architecture.md)
-shows the delivery components. These are managed sessions, separate from native
-subagent trees.
+The relay does not choose a leader or require a model/provider pairing. It routes
+explicit messages between registered peers according to their configured
+permissions. More peers can join the same mailbox; manager/worker teams are an
+[optional usage pattern](#use-claude-or-codex-as-the-manager). The delivery supervisor
+is runtime infrastructure, not an AI manager. The [architecture diagram](docs/architecture.md)
+shows the MCP servers, shared mailbox, and optional runtime delivery components.
 
 ## Quick start: connect Codex CLI and Claude Code
 
@@ -170,6 +162,9 @@ cap**. See the [delivery and budget contract](docs/architecture.md#limits-and-tr
 
 ## Use Claude or Codex as the manager
 
+This is an optional delegation example. Ordinary peer-to-peer conversations do
+not need a manager.
+
 A manager is a **configured peer with a task prompt**, not a special provider or a
 native subagent parent. AgentRelay launches its workers when assignments arrive,
 keeps their sessions separate, and delivers results back to the manager. Workers
@@ -197,8 +192,8 @@ errors. It does not prove the model's reasoning or ACK timing relative to closur
 
 ```mermaid
 flowchart TD
-    M[Manager: Claude or Codex] -->|assignment via MCP mailbox| A[Worker A: other runtime]
-    M -->|assignment via MCP mailbox| B[Worker B: other runtime]
+    M["Agent in optional manager role"] -->|assignment via MCP mailbox| A["Peer A"]
+    M -->|assignment via MCP mailbox| B["Peer B"]
     A -->|linked result| M
     B -->|linked result| M
     M --> V[Receive both results and review]
@@ -289,6 +284,32 @@ with its own identity and token. Other clients may need a different configuratio
 shape; Codex uses TOML. Mailbox access alone does not wake an idle agent: automatic
 delivery needs a runtime adapter and supervisor. To add an adapter, follow the
 [contribution guide](CONTRIBUTING.md) and [architecture](docs/architecture.md).
+
+## Use other models and agent applications
+
+**A model is the inference engine; an agent runtime supplies the tool loop and
+session state. MCP exposes the mailbox tools to that runtime.** Supporting MCP
+therefore does not automatically run every model or wake an idle agent.
+
+| What you want to add | Current path |
+|---|---|
+| Another model supported by Codex CLI or Claude Code | Choose its model ID using `--codex-model` / `--claude-model` during initialization, or edit a peer's `model` before its first run |
+| Another MCP-capable agent application | Register its peer identity/routes/conversation and connect it to its per-peer stdio MCP server; this is currently an advanced integration, without a one-command attach workflow |
+| A raw API or local model | Supply an agent host/tool loop plus a compatible runtime adapter for automatic delivery; this repository currently has no LiteLLM or generic API adapter |
+
+The transport is provider-neutral. The included automatic delivery adapters are
+`codex` and `claude`; changing `runtime` to another name in the config is currently
+rejected. Changing a model name does not switch providers or add tools that a
+runtime does not support.
+
+[LiteLLM](https://docs.litellm.ai/docs/) can simplify model-provider API calls, while
+[MCP](https://modelcontextprotocol.io/docs/learn/architecture) supplies the standard
+tool connection. They solve different parts of the integration. An optional API
+runtime could combine them without replacing the relay or requiring an LLM manager.
+That adapter is a proposed extension, **not an implemented or tested capability**.
+API-backed models would use provider keys/billing and adapter-owned history rather
+than automatically inheriting authenticated CLI subscriptions or native CLI sessions.
+Tool-calling compatibility must be checked for each selected model/endpoint.
 
 ## Limitations and permissions
 
